@@ -32,6 +32,9 @@ Turn Hall of Meat off by turning the asset pack off in the MODS tab (Insert menu
 - **Skate 3's score graphs** for bail time, drop, air, speed and rotation (they reproduce the original
   HUD's readings), and the HUD rules from its `homscoring` script.
 - **Skate 3's bone-crunch sounds**, decoded from its HOM banks.
+- **Orange bone glow**: hurt bones heat from bone white to Skate 3's orange, broken ones burn red-orange.
+- **Broken-bone slow motion** (single player only) and red screen edges on a break, as Skate 3's `IsBrokenBoneSlowMo`.
+- **Each map's best bail**, saved with the profile (NEW BEST / BEST under the score).
 - **The HoM look**, measured from Skate 3's footage: cool blue-grey, colour pulled out, black corners,
   coarse film grain.
 - **Crash detection** tuned frame by frame on 20 test recordings: wipeouts, slams, being knocked off,
