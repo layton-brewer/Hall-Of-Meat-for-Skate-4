@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.0
+- Skate 3's broken-bone slow-motion sounds (hom_slo_mo), for ReSkate Hall of Meat 1.5.0 and later.
+
 ## 1.0.1
 - Built on ReSkate v1.1.8, so it plays with everyone else in multiplayer.
 - The launcher's Thunderstore install accepts the pack.

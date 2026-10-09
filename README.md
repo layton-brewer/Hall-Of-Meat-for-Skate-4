@@ -34,6 +34,7 @@ Turn Hall of Meat off by turning the asset pack off in the MODS tab (Insert menu
 - **Skate 3's bone-crunch sounds**, decoded from its HOM banks.
 - **Orange bone glow**: hurt bones heat from bone white to Skate 3's orange, broken ones burn red-orange.
 - **Broken-bone slow motion** (single player only) and red screen edges on a break, as Skate 3's `IsBrokenBoneSlowMo`.
+- **Skate 3's car bonus** (its `VehicleData`: 2,000 a car) with its own chip, and Skate 3's slow-motion sound.
 - **Each map's best bail**, saved with the profile (NEW BEST / BEST under the score).
 - **The HoM look**, measured from Skate 3's footage: cool blue-grey, colour pulled out, black corners,
   coarse film grain.

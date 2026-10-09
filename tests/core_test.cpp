@@ -329,6 +329,22 @@ int main() {
         std::printf("     bails %d, hands/feet damage %.2f, torso %.2f\n", m.bails, limbs, m.t.live().damage[2]);
         failures += check("leaving the board mid-air does not break the hands and feet", m.bails == 1 && limbs <= m.t.live().damage[2] + 0.01f);
     }
+    {   // Skate 3's car bonus: hit by a car, 2,000; touching it on the next ticks pays nothing more.
+        Sim m;
+        m.run(1.0, {0, 0, 7}, 100, true, false);
+        m.s.vehicle = true;
+        m.run(0.1, {0, 0, 7}, 300, false, true);
+        m.run(0.3, {0, 0, 3}, 504, false, true);
+        m.s.vehicle = false;
+        m.run(1.6, {0, 0, 0}, 504, false, true);
+        const bool one = m.t.live().car_count == 1 && m.t.live().car_points == 2000;
+        m.s.vehicle = true;                              // a second car, later
+        m.run(0.1, {0, 0, 0}, 504, false, true);
+        m.s.vehicle = false;
+        m.run(0.5, {0, 0, 0}, 504, false, true);
+        std::printf("     cars %d points %d\n", m.t.live().car_count, m.t.live().car_points);
+        failures += check("car bonus: 2,000 a car, apart by its gap", one && m.t.live().car_count == 2 && m.t.live().car_points == 4000);
+    }
     // Skate 3's graphs against the original's HUD readings.
     failures += check("bail 7.10 s pays 7,750", metric_points(3, 7.10f) == 7750);
     failures += check("drop 31.5 m pays ~5,750", std::abs(metric_points(2, 31.5f) - 5750) <= 10);
