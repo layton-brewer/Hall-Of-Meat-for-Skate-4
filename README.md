@@ -29,8 +29,8 @@ Both can be installed: this one steps aside whenever ReSkate's is switched on, s
 
 ## Download
 
-- **[Latest release](https://github.com/layton-brewer/ReSkate-Hall-Of-Meat/releases/latest)** (also on the
-  [ReSkate fork](https://github.com/layton-brewer/ReSkate/releases/latest)):
+- **[Latest release](https://github.com/layton-brewer/Skate3-Hall-Of-Meat/releases/latest)** (also on the
+  [ReSkate fork](https://github.com/layton-brewer/ReSkate-Skate3-Hall-Of-Meat/releases/latest)):
   - `ReSkate-HallOfMeat-<version>.zip`: ReSkateLauncher.exe and ReSkate.dll (official ReSkate v2.0.1 plus
     Skate 3 Hall of Meat, so multiplayer works with everyone on v2.0.1).
   - `Hall_of_Meat-<version>.zip`: the asset pack (Thunderstore format).
@@ -69,7 +69,7 @@ Turn Hall of Meat off by turning the asset pack off in the MODS tab (Insert menu
 | Folder | Contents |
 |---|---|
 | `mod/` | The Thunderstore asset pack: manifest, README, changelog, icon, and `HallOfMeat/` (Skate 3's art, X-ray meshes, sounds, fonts). |
-| `source/` | A snapshot of `Extension/Skate3HallOfMeat/` from the fork (the live code is in [layton-brewer/ReSkate](https://github.com/layton-brewer/ReSkate/tree/skate3-hom-2.0.1)). |
+| `source/` | A snapshot of `Extension/Skate3HallOfMeat/` from the fork (the live code is in [layton-brewer/ReSkate-Skate3-Hall-Of-Meat](https://github.com/layton-brewer/ReSkate-Skate3-Hall-Of-Meat/tree/skate3-hom-2.0.1)). |
 | `tests/` | `core_test.cpp`: offline checks of the crash detection and scoring, many rebuilt from test-video logs. |
 | `tools/` | The Skate 3 research tools: XEX decryption, EA APT script disassembly, attribute vault reader and name hashing, EA-XMA sound decoding, texture and mesh export. |
 | `docs/` | `HOM-FINDINGS.md`: what Skate 3's files say about Hall of Meat. |

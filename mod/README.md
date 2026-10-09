@@ -18,7 +18,7 @@ bone lit up as it happens. The Thrasher score panel counts your bail the way Ska
 ## Requirements
 - **ReSkate with Hall of Meat built in.** This package holds the art, meshes and sounds. The code that
   draws them is part of ReSkate.dll. Until it ships in an official ReSkate release, use the build from
-  https://github.com/layton-brewer/ReSkate/releases/latest
+  https://github.com/layton-brewer/ReSkate-Skate3-Hall-Of-Meat/releases/latest
 - Offline play.
 
 ## Use
