@@ -1,7 +1,7 @@
 {
     "name": "Hall_of_Meat",
     "version_number": "1.1.0",
-    "website_url": "https://github.com/layton-brewer/ReSkate-Skate3-Hall-Of-Meat/releases/latest",
+    "website_url": "https://github.com/layton-brewer/ReSkate-Hall-Of-Meat/releases/latest",
     "description": "Skate 3's Hall of Meat for ReSkate: X-ray bones on every crash, Skate 3's damage and score tables, HUD, colour grade, orange bone glow, slow motion, car bonus and bone-crunch sounds.",
     "dependencies": []
 }
