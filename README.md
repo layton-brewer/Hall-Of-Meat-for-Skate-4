@@ -1,8 +1,31 @@
-# ReSkate Hall of Meat
+# Skate 3 Hall of Meat for ReSkate
 
-Skate 3's Hall of Meat for skate. through [ReSkate](https://github.com/Dingo-Shenanigans/ReSkate). Crash,
-and the picture closes in to a dark, grainy spotlight while your skeleton shows through the body:
-every bruised, dislocated and broken bone lit up as it happens, with Skate 3's Thrasher score panel.
+**The nostalgic one.** Skate 3's Hall of Meat, brought to skate. through
+[ReSkate](https://github.com/Dingo-Shenanigans/ReSkate) with Skate 3's own data: its bone meshes, damage
+table, score graphs, Thrasher score panel, bone-crunch and slow-motion sounds, colour grade and film grain.
+Crash, and the picture closes in to a dark, grainy blue-grey spotlight while your skeleton shows through
+the body, every hurt bone glowing orange and every break burning red as it happens.
+
+## Why this one
+
+ReSkate 2.0 ships a Hall of Meat of its own: a fresh take built from skate.'s parts. This mod is the
+other road: Skate 3's Hall of Meat itself, rebuilt from Skate 3's files and tuned frame by frame against
+Skate 3 footage, so it looks, sounds and scores the way you remember.
+
+| | Skate 3 Hall of Meat (this mod) | ReSkate's built-in Hall of Meat |
+|---|---|---|
+| Skeleton | Skate 3's own X-ray bone meshes and bone texture | skate.'s Dem Bones costume mesh |
+| Hurt bones | Skate 3's orange glow, red-orange throbbing breaks | yellow bruises, red breaks |
+| Score panel | Skate 3's Thrasher "Hall of Meat" panel and rows | ReSkate's Meat card |
+| Scoring | Skate 3's 25-part damage table and score graphs for air, drop, bail time, speed and rotation | ReSkate's own Meat formula |
+| Sounds | Skate 3's bone crunches and slow-motion sound | none |
+| Look | Skate 3's colour matrix, blue-grey grade, spotlight and film grain | red screen edge pulse |
+| Slow motion on a break | yes (single player), as Skate 3's `IsBrokenBoneSlowMo` | yes (single player) |
+| Car hits | Skate 3's car bonus (2,000 a car) with its chip | count half again |
+| Each map's best | yes | yes |
+| Multiplayer | yes (built on ReSkate v2.0.1) | yes |
+
+Both can be installed: this one steps aside whenever ReSkate's is switched on, so only one shows at a time.
 
 ## Download
 
@@ -11,8 +34,7 @@ every bruised, dislocated and broken bone lit up as it happens, with Skate 3's T
   - `ReSkate-HallOfMeat-<version>.zip`: ReSkateLauncher.exe and ReSkate.dll (official ReSkate v2.0.1 plus
     Skate 3 Hall of Meat, so multiplayer works with everyone on v2.0.1).
   - `Hall_of_Meat-<version>.zip`: the asset pack (Thunderstore format).
-- ReSkate 2.0 has its own, separate Hall of Meat (Custom Stuff > Player > Hall of Meat). This one stands
-  down whenever that one is switched on, so only one shows at a time.
+- Leave ReSkate's own Hall of Meat off (Custom Stuff > Player > Hall of Meat) to see this one.
 
 ## Install
 
