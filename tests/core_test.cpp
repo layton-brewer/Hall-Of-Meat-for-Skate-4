@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cmath>
 #include <functional>
+#include <algorithm>
 
 using namespace dingosdk::hall_of_meat;
 
@@ -277,6 +278,56 @@ int main() {
         m.run(0.05, {0, 0, 0.3f}, 504, false, true);       // smashes into the ground
         m.run(1.5, {0, 0, 0}, 504, false, true);           // and lies there
         failures += check("a glide that ends in a smash is shown once the skater stays down", m.t.showing());
+    }
+    {   // Crash, then keep tumbling off an edge feet first: upright but still dropping is not getting up.
+        Sim m;
+        m.run(1.0, {0, 0, 7}, 100, true, false);
+        m.run(0.1, {0, 0, 7}, 300, false, true);
+        m.run(0.6, {0, 0, 1}, 504, false, true);
+        m.run(1.2, {0, -1, 1}, 504, true, false, -1, true); // upright, falling
+        failures += check("upright while still falling does not end the bail", m.finished == 0 && m.t.phase() == Phase::bailing);
+    }
+    {   // Mid-tumble the state flicks to the board for a few ticks: the bail carries on.
+        Sim m;
+        m.run(1.0, {0, 0, 7}, 100, true, false);
+        m.run(0.1, {0, 0, 7}, 300, false, true);
+        m.run(0.5, {0, -3, 3}, 504, false, true);
+        m.run(0.15, {0, -3, 3}, 201, false, false);
+        m.run(0.5, {0, -3, 3}, 504, false, true);
+        failures += check("a flick back to the board mid-tumble does not end the bail", m.finished == 0 && m.t.phase() == Phase::bailing);
+    }
+    {   // Crash, stand for a moment, then go straight down a drop: one continuous bail.
+        Sim m;
+        m.run(1.0, {0, 0, 7}, 100, true, false);
+        m.run(0.8, {0, -9, 6}, 504, false, true);
+        m.run(1.5, {0, 0, 0.5}, 504, false, true);
+        m.run(0.6, {0, 0, 0}, 504, true, false);           // up (the bail ends)
+        const auto first = m.last.serial;
+        const int bones_before = m.last.bone_points;
+        m.run(0.8, {0, -9, 2}, 504, false, true);          // falls off the edge
+        m.run(0.05, {0, 0, 0.3f}, 504, false, true);       // lands hard again
+        m.run(1.0, {0, 0, 0}, 504, false, true);
+        failures += check("a second drop straight after carries on the same bail",
+                          m.finished == 1 && m.t.phase() == Phase::bailing && m.t.live().serial == first && m.t.carried_on() &&
+                              m.t.live().bone_points >= bones_before);
+    }
+    {   // Leaving the board in the air: the pose snaps over and flings only the hands and feet, then
+        // the skater lands on their back. The hands and feet must not show the snap as breaks.
+        Sim m;
+        m.run(1.0, {0, 0, 7}, 100, true, false);
+        m.run(0.4, {0, 3, 7}, 201, true, false);
+        m.run(1.0 / 60, {0, 1, 7}, 504, false, false);
+        for (int i : {9, 10, 15, 16, 17, 18}) m.s.bone_centres[i][2] -= 0.5f; // limbs jump back while the torso flies on
+        m.run(1.0 / 60, {0, 1, 7}, 504, false, false);
+        for (int i : {9, 10, 15, 16, 17, 18}) m.s.bone_centres[i][2] += 0.5f;
+        m.run(1.0 / 60, {0, 1, 7}, 504, false, false);
+        m.run(0.5, {0, 0, 6}, 504, false, true, -1, true);
+        m.run(0.05, {0, 0, 1}, 504, false, true);           // lands on the back
+        m.run(1.5, {0, 0, 0}, 504, false, true);
+        float limbs = 0;
+        for (int i : {9, 10, 15, 16, 17, 18}) limbs = std::max(limbs, m.t.live().damage[i]);
+        std::printf("     bails %d, hands/feet damage %.2f, torso %.2f\n", m.bails, limbs, m.t.live().damage[2]);
+        failures += check("leaving the board mid-air does not break the hands and feet", m.bails == 1 && limbs <= m.t.live().damage[2] + 0.01f);
     }
     // Skate 3's graphs against the original's HUD readings.
     failures += check("bail 7.10 s pays 7,750", metric_points(3, 7.10f) == 7750);
