@@ -1,9 +1,9 @@
-#include "hall_of_meat_hud.h"
+#include "s3hom_hud.h"
 #include "Extension/Console/commands.h"
 
 // The `hom` console commands: Hall Of Meat status and diagnostics.
 namespace dingosdk::console {
-void register_hall_of_meat_commands(Commands &registry) {
+void register_skate3_hom_commands(Commands &registry) {
     struct Verb {
         const char *name, *description, *usage;
     };
@@ -33,7 +33,7 @@ void register_hall_of_meat_commands(Commands &registry) {
                         start = end + 1;
                     }
                 }
-            out(overlay::hall_of_meat_command(name, words));
+            out(overlay::skate3_hom_command(name, words));
         };
         registry.add(std::move(entry));
     }

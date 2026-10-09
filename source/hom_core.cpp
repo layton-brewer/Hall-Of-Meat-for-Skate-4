@@ -3,7 +3,7 @@
 #include <cmath>
 #include <cstdio>
 
-namespace dingosdk::hall_of_meat {
+namespace dingosdk::skate3_hom {
 const std::array<BodyPart, body_parts> &body_parts_table() {
     // Copied from Skate 3's skatercollections database (the HoM scoring class's layout data): per
     // part, its four links {part, share} and its six damage-level slots {points, impact}. Parts:
@@ -581,4 +581,4 @@ bool Tracker::update(const Sample &s) {
     have_previous_ = true;
     return finished;
 }
-} // namespace dingosdk::hall_of_meat
+} // namespace dingosdk::skate3_hom

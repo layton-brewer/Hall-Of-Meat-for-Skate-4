@@ -6,10 +6,11 @@
 // bail tracker and draws the live bail and the result card. Presentation thread only.
 namespace dingosdk::overlay {
 // Game thread: once per client tick, after the trainer has published its telemetry.
-void hall_of_meat_tick();
+// `stand_down` while ReSkate's own Hall of Meat is on: this one shows nothing then.
+void skate3_hom_tick(bool stand_down = false);
 // True while a bail is live or a result is on screen (also keeps frames coming so bails are seen).
-bool hall_of_meat_hud_pending();
-void draw_hall_of_meat_hud();
+bool skate3_hom_hud_pending();
+void draw_skate3_hom_hud();
 // `hom <verb> ...` console commands (any thread).
-std::string hall_of_meat_command(std::string_view verb, const std::vector<std::string> &words);
+std::string skate3_hom_command(std::string_view verb, const std::vector<std::string> &words);
 } // namespace dingosdk::overlay

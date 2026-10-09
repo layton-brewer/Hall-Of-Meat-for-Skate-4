@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-namespace dingosdk::hall_of_meat {
+namespace dingosdk::skate3_hom {
 namespace {
 namespace fs = std::filesystem;
 
@@ -148,4 +148,4 @@ void play_bone_sound(float strength, bool broken) noexcept {
     } catch (...) {
     }
 }
-} // namespace dingosdk::hall_of_meat
+} // namespace dingosdk::skate3_hom

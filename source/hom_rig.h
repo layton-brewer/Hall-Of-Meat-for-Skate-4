@@ -8,7 +8,7 @@
 // Hall Of Meat's view of the local skater's skeleton, for the X-ray. The game thread reads the
 // animation pose every client tick (hom_rig.cpp) and publishes one world-space segment per bone of
 // the original's X-ray skeleton (the 19 `dem_bones_hom` meshes); the HUD projects them.
-namespace dingosdk::hall_of_meat {
+namespace dingosdk::skate3_hom {
 // Same order as bones() in hom_core.cpp.
 inline constexpr std::size_t rig_bones = 19;
 struct RigSegment {
@@ -87,4 +87,4 @@ inline std::atomic<bool> &rig_probe_requested() {
 }
 // Game thread, once per client tick, before the bail tracker.
 void rig_tick(std::uintptr_t base, std::uintptr_t client) noexcept;
-} // namespace dingosdk::hall_of_meat
+} // namespace dingosdk::skate3_hom

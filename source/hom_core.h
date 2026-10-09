@@ -8,7 +8,7 @@
 // feed it one Sample per client tick and it tracks a bail from the moment the skater wipes out
 // until they are back on their feet, breaks bones from the hits each X-ray bone takes and scores
 // the bail the way Skate 3's HUD does: 500 a bone, plus air, drop, bail time, speed and rotation.
-namespace dingosdk::hall_of_meat {
+namespace dingosdk::skate3_hom {
 
 struct Sample {
     double time{}; // seconds, monotonic
@@ -219,4 +219,4 @@ private:
 };
 
 const char *title_for(int total, std::size_t bones_broken);
-} // namespace dingosdk::hall_of_meat
+} // namespace dingosdk::skate3_hom

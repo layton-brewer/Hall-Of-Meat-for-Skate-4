@@ -1,4 +1,4 @@
-#include "hall_of_meat_hud.h"
+#include "s3hom_hud.h"
 #include "hom_art.h"
 #include "hom_audio.h"
 #include "hom_grade.h"
@@ -28,7 +28,7 @@
 // and a stack of metric rows sit over the Thrasher "Hall of Meat" mark and the score.
 namespace dingosdk::overlay {
 namespace {
-using namespace dingosdk::hall_of_meat;
+using namespace dingosdk::skate3_hom;
 using Clock = std::chrono::steady_clock;
 
 constexpr double linger_seconds = 4.0, fade_seconds = 0.8;
@@ -336,12 +336,12 @@ void draw_grain(ImDrawList *draw, float strength) {
 // the bones that got hurt show through the body: warm white, the broken ones orange, red at the break.
 void draw_xray(ImDrawList *draw, const Result &r, float bones_alpha, float fade, float darkness) {
     const auto display = ImGui::GetIO().DisplaySize;
-    auto rig = hall_of_meat::latest_rig();
+    auto rig = skate3_hom::latest_rig();
     if (rig.valid) {
         // The pose was read at the client tick; carry each bone on so the X-ray keeps up with the
         // body it is drawn over. Read from the physics bodies, the pose is this frame's: carry it only by the time since
         // the read. From the animation pose (a frame behind) add that frame.
-        const float extra = hall_of_meat::rig_from_bodies().load() ? 0.0f : rig.period;
+        const float extra = skate3_hom::rig_from_bodies().load() ? 0.0f : rig.period;
         const float ahead = std::clamp(static_cast<float>(std::chrono::duration<double>(Clock::now() - rig.at).count()) + extra, 0.0f, 0.09f);
         for (auto &seg : rig.bones)
             for (std::size_t k = 0; k < 3; ++k) {
@@ -376,14 +376,14 @@ void draw_xray(ImDrawList *draw, const Result &r, float bones_alpha, float fade,
     }
     draw_grain(draw, 0.5f * darkness * fade);
     if (!camera) return;
-    std::array<bool, hall_of_meat::rig_bones> broken{};
+    std::array<bool, skate3_hom::rig_bones> broken{};
     for (const auto &b : r.broken)
         if (b.bone < broken.size()) broken[b.bone] = true;
     const bool meshes = hom_bones_ready();
     // Getting up, or the bail is over: the original's X-ray is gone (only the grade fades out).
     if (bones_alpha <= 0.0f) return;
     for (int pass = 0; pass < 2; ++pass)
-        for (std::size_t i = 0; i < hall_of_meat::rig_bones; ++i) {
+        for (std::size_t i = 0; i < skate3_hom::rig_bones; ++i) {
             const float damage = r.damage[i];
             if (!broken[i] && damage <= 0.0f) continue;
             if (broken[i] != (pass == 1)) continue;
@@ -401,7 +401,7 @@ void draw_xray(ImDrawList *draw, const Result &r, float bones_alpha, float fade,
             // Skate 3's colours, measured from the original: hurt (223, 212, 214), broken (198, 87, 64),
             // fracture (158, 43, 23), after its bone map; these tints give those through the map.
             const ImU32 tint = broken[i] ? IM_COL32(235, 103, 75, 255) : IM_COL32(255, 244, 246, 255);
-            const auto &facing = seg.has_front && hall_of_meat::roll_from_joints().load() ? seg.front : rig.forward;
+            const auto &facing = seg.has_front && skate3_hom::roll_from_joints().load() ? seg.front : rig.forward;
             draw_hom_bone(draw, projector, i, seg.a, seg.b, facing, tint, strength * fade * bones_alpha, broken[i] ? 0.85f : 0.0f);
         }
 }
@@ -409,15 +409,15 @@ void draw_xray(ImDrawList *draw, const Result &r, float bones_alpha, float fade,
 } // namespace
 
 // Game thread, once per client tick after the trainer has published its telemetry.
-void hall_of_meat_tick() {
+void skate3_hom_tick(bool stand_down) {
     auto &s = state();
     const auto telemetry = trainer::telemetry();
     std::lock_guard lock(s.mutex);
     // Off while its asset mod is not installed or is turned off in the MODS tab.
-    if (!telemetry.skater || hom_directory().empty()) {
+    if (stand_down || !telemetry.skater || hom_directory().empty()) {
         if (s.tracker.phase() == Phase::bailing) s.tracker.reset();
         s.visible_until = 0;
-        hall_of_meat::hide_game_ui().store(false);
+        skate3_hom::hide_game_ui().store(false);
         s.last_time = -1;
         return;
     }
@@ -432,11 +432,11 @@ void hall_of_meat_tick() {
     in.airborne = telemetry.airborne;
     in.physics_state = telemetry.physics_state;
     in.heading = telemetry.heading;
-    if (const auto rig = hall_of_meat::latest_rig(); rig.valid) {
+    if (const auto rig = skate3_hom::latest_rig(); rig.valid) {
         in.bones_valid = true;
-        in.upright = hall_of_meat::rig_upright().load();
-        in.lying = hall_of_meat::rig_lying().load();
-        for (std::size_t i = 0; i < hall_of_meat::rig_bones; ++i)
+        in.upright = skate3_hom::rig_upright().load();
+        in.lying = skate3_hom::rig_lying().load();
+        for (std::size_t i = 0; i < skate3_hom::rig_bones; ++i)
             for (std::size_t k = 0; k < 3; ++k) in.bone_centres[i][k] = (rig.bones[i].a[k] + rig.bones[i].b[k]) * 0.5f;
     }
     // Calibration log: every physics state change, and a heartbeat, so a missed bail can be traced.
@@ -459,7 +459,7 @@ void hall_of_meat_tick() {
     }
     const bool was_bailing = s.tracker.phase() == Phase::bailing;
     const bool done = s.tracker.update(in);
-    hall_of_meat::hide_game_ui().store(s.tracker.showing() || now < s.visible_until);
+    skate3_hom::hide_game_ui().store(s.tracker.showing() || now < s.visible_until);
     if (s.tracker.cancelled() != s.cancelled_seen) {
         s.cancelled_seen = s.tracker.cancelled();
         logging::log(logging::Level::info, logging::Channel::assets, "Hall Of Meat: that was a glide landing, not a crash: taken back.");
@@ -472,7 +472,7 @@ void hall_of_meat_tick() {
         s.started = now;
         s.shown_total = 0;
         // Calibration: the X-ray skull and pelvis against the skater's own position.
-        if (const auto rig = hall_of_meat::latest_rig(); rig.valid)
+        if (const auto rig = skate3_hom::latest_rig(); rig.valid)
             logging::log(logging::Level::info, logging::Channel::assets,
                          "Hall Of Meat: bail started by {}: skater ({:.2f}, {:.2f}, {:.2f}), skull ({:.2f}, {:.2f}, {:.2f}), hips ({:.2f}, {:.2f}, {:.2f}).",
                          s.tracker.trigger(), in.position[0], in.position[1], in.position[2], rig.bones[0].a[0], rig.bones[0].a[1], rig.bones[0].a[2],
@@ -492,7 +492,7 @@ void hall_of_meat_tick() {
         for (; !hold && s.sounded < r.events.size(); ++s.sounded) {
             const auto &e = r.events[s.sounded];
             const int n = std::max(1, level_count(static_cast<std::size_t>(e.part)));
-            hall_of_meat::play_bone_sound(static_cast<float>(e.level) / static_cast<float>(n), e.top);
+            skate3_hom::play_bone_sound(static_cast<float>(e.level) / static_cast<float>(n), e.top);
         }
     }
     if (done) {
@@ -506,25 +506,25 @@ void hall_of_meat_tick() {
     }
 }
 
-bool hall_of_meat_hud_pending() {
+bool skate3_hom_hud_pending() {
     auto &s = state();
     std::lock_guard lock(s.mutex);
     return s.tracker.showing() || clock_seconds() < s.visible_until;
 }
 
-std::string hall_of_meat_command(std::string_view verb, const std::vector<std::string> &words) {
+std::string skate3_hom_command(std::string_view verb, const std::vector<std::string> &words) {
     auto &s = state();
     std::lock_guard lock(s.mutex);
     if (verb == "roll") {
-        if (!words.empty()) hall_of_meat::roll_from_joints().store(words[0] != "0");
-        return std::string("Hall Of Meat: bone roll from ") + (hall_of_meat::roll_from_joints().load() ? "the joints." : "the body forward.");
+        if (!words.empty()) skate3_hom::roll_from_joints().store(words[0] != "0");
+        return std::string("Hall Of Meat: bone roll from ") + (skate3_hom::roll_from_joints().load() ? "the joints." : "the body forward.");
     }
     if (verb == "phys") {
-        hall_of_meat::phys_probe_requested().store(true);
+        skate3_hom::phys_probe_requested().store(true);
         return "Hall Of Meat: reading the physics bodies, see ReSkate.log.";
     }
     if (verb == "rig") {
-        hall_of_meat::rig_probe_requested().store(true);
+        skate3_hom::rig_probe_requested().store(true);
         return "Hall Of Meat: reading the skeleton, see ReSkate.log.";
     }
     if (verb == "status") {
@@ -533,7 +533,7 @@ std::string hall_of_meat_command(std::string_view verb, const std::vector<std::s
     return "Hall Of Meat: status, rig, phys, roll 0|1.";
 }
 
-void draw_hall_of_meat_hud() {
+void draw_skate3_hom_hud() {
     auto &s = state();
     const auto display = ImGui::GetIO().DisplaySize;
     if (display.x <= 0 || display.y <= 0) return;

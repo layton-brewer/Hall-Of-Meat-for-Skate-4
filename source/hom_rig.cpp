@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-namespace dingosdk::hall_of_meat {
+namespace dingosdk::skate3_hom {
 namespace {
 using client_source::detail::first_person_read;
 void say(const std::string &text) { logging::log(logging::Level::info, logging::Channel::assets, "HoM rig: {}", text); }
@@ -397,4 +397,4 @@ void rig_tick(std::uintptr_t base, std::uintptr_t client) noexcept {
         say("failed");
     }
 }
-} // namespace dingosdk::hall_of_meat
+} // namespace dingosdk::skate3_hom

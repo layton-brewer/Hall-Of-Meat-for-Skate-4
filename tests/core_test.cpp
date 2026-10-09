@@ -1,12 +1,12 @@
 // Offline checks of the Hall Of Meat bail tracker with synthetic skeleton motion.
-#include "Extension/HallOfMeat/hom_core.h"
+#include "Extension/Skate3HallOfMeat/hom_core.h"
 #include <cstdio>
 #include <cmath>
 #include <cmath>
 #include <functional>
 #include <algorithm>
 
-using namespace dingosdk::hall_of_meat;
+using namespace dingosdk::skate3_hom;
 
 struct Sim {
     Tracker t;
