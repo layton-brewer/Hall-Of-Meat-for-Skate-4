@@ -1,0 +1,8 @@
+# Changelog
+
+## 1.0.1
+- Built on ReSkate v1.1.8, so it plays with everyone else in multiplayer.
+- The launcher's Thunderstore install accepts the pack.
+
+## 1.0.0
+- First release: Skate 3's Hall of Meat X-ray, HUD, score graphs, 25-part damage table and bone sounds.
