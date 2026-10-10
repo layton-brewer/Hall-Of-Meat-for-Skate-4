@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.3
+- Install is one download: Hall-of-Meat.zip from GitHub, extracted into the skate. folder.
+
 ## 1.1.2
 - README: works on its own once ReSkate ships Skate 3 Hall of Meat (how to check), and the build to use until then.
 

@@ -22,45 +22,35 @@ while Skate 3's Thrasher score panel counts your bail the way Skate 3 did.
 - Triggers on every crash, on or off the board. Glides, hippy jumps and plants don't count.
 - Works in multiplayer sessions (the slow motion stays single player).
 
-## Requirements
-- **A ReSkate with Skate 3 Hall of Meat built in.** This package holds Skate 3's art, meshes and
-  sounds; the code that draws them is part of ReSkate itself. It is on its way into official ReSkate
-  (https://github.com/Dingo-Shenanigans/ReSkate/pull/150): once your ReSkate has it, installing this
-  package is all you need. To check, type `hom status` in the console (`~`); if ReSkate doesn't know
-  the command, your ReSkate doesn't have it yet.
-- **Until then**, use the ReSkate build that has it: get `ReSkate-HallOfMeat-<version>.zip` from
-  https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest and copy
-  `ReSkateLauncher.exe` and `ReSkate.dll` beside `Skate.exe`. It is official ReSkate v2.0.1 plus Hall
-  of Meat, so multiplayer works with everyone on 2.0.1.
-- ReSkate 2.0 has its own, separate Hall of Meat (Custom Stuff > Player > Hall of Meat). Leave that
-  one off to see this one; this one steps aside whenever it is on.
+## Install (one download)
+This package is Skate 3's art, meshes and sounds; the code that draws them is in a ReSkate build that
+comes with it in one zip:
 
-## Install
 1. Close the game.
-2. **ReSkate with Skate 3 Hall of Meat** (skip once official ReSkate ships it, see Requirements):
-   download `ReSkate-HallOfMeat-<version>.zip` from
-   https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest, and copy
-   `ReSkateLauncher.exe` and `ReSkate.dll` from it into your skate. folder (where `Skate.exe` is),
-   replacing the ones there. Steam: right-click skate. > Manage > Browse local files.
-3. **This package**: in the ReSkate launcher, open **MODS**, find **Hall of Meat** and install it
-   (or drag this zip onto the MODS page). Make sure it is switched on.
-4. Start the game with `ReSkateLauncher.exe`. In game, keep ReSkate's own Hall of Meat off
-   (Custom Stuff > Player > Hall of Meat).
-5. Bail. Hard.
+2. Download **Hall-of-Meat.zip**:
+   https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest/download/Hall-of-Meat.zip
+3. Extract it into your skate. folder, where `Skate.exe` is (Steam: right-click skate. > Manage >
+   Browse local files). Say yes to replacing files.
+4. Start the game with `ReSkateLauncher.exe`, and bail.
 
-To switch it off, turn the package off in the MODS tab (in game: Insert > MODS).
+The zip already contains this package, so installing it here as well is optional. In game, keep
+ReSkate's own Hall of Meat off (Custom Stuff > Player > Hall of Meat). To switch Hall of Meat off,
+turn it off in the MODS tab (Insert > MODS).
+
+Once official ReSkate includes Skate 3 Hall of Meat, installing this package from the MODS page will
+be all you need.
 
 ## Console (`~`)
 - `hom status`: shows it is running, and your best bail.
 - `hom lead <ms>`: pulls the X-ray ahead if the bones ever trail the body on your machine (saved).
 
 ## Troubleshooting
-- **Nothing on a crash:** type `hom status`. Unknown command: your ReSkate has no Skate 3 Hall of
-  Meat yet (step 2). If it answers, check this package is installed and switched on (step 3), and
+- **Nothing on a crash:** type `hom status`. Unknown command: the zip's ReSkate isn't in place
+  (step 3). If it answers, check this package is installed and switched on (step 3), and
   that ReSkate's own Hall of Meat is off (step 4).
 - **No bone sounds:** the game found no sound output device; plug one in and they start on their own.
 - **It went back to normal after a ReSkate update:** the official launcher puts back the official
-  ReSkate.dll. Redo step 2 until official ReSkate includes it.
+  ReSkate.dll. Extract the zip again until official ReSkate includes it.
 
 ## Credits
 Hall of Meat, its art, meshes and sounds are from Skate 3 by EA Black Box. Thrasher is a trademark of
