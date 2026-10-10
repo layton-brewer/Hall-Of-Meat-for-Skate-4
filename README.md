@@ -1,5 +1,7 @@
 # Hall of Meat for Skate 4
 
+<img src="docs/cover.png" width="360" alt="Skate 3's Hall of Meat X-ray skeleton">
+
 **The nostalgic one.** Skate 3's Hall of Meat, brought to Skate 4 (skate.) through
 [ReSkate](https://github.com/Dingo-Shenanigans/ReSkate) with Skate 3's own data: its bone meshes, damage
 table, score graphs, Thrasher score panel, bone-crunch and slow-motion sounds, colour grade and film grain.

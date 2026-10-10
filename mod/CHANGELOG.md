@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+- New cover: Skate 3's own Hall of Meat X-ray skeleton.
+- README for Thunderstore: what's in it and the ReSkate build it needs.
+
 ## 1.1.0
 - Skate 3's broken-bone slow-motion sounds (hom_slo_mo), for ReSkate Hall of Meat 1.5.0 and later.
 
