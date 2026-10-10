@@ -8,6 +8,19 @@ table, score graphs, Thrasher score panel, bone-crunch and slow-motion sounds, c
 Crash, and the picture closes in to a dark, grainy blue-grey spotlight while your skeleton shows through
 the body, every hurt bone glowing orange and every break burning red as it happens.
 
+## Download and install
+
+### [⬇ Download Hall-of-Meat.zip](https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest/download/Hall-of-Meat.zip)
+
+1. Close the game.
+2. Extract the zip into your skate. folder, where `Skate.exe` is (Steam: right-click skate. >
+   Manage > Browse local files). Say yes to replacing files.
+3. Start the game with `ReSkateLauncher.exe`, and bail.
+
+That's everything: the zip has ReSkate (official v2.0.1, so multiplayer works) with Hall of Meat
+built in, and the Hall of Meat mod. In game, keep ReSkate's own Hall of Meat off (Custom Stuff >
+Player > Hall of Meat). To switch Hall of Meat off, turn it off in the MODS tab (Insert > MODS).
+
 ## Why this one
 
 ReSkate 2.0 ships a Hall of Meat of its own: a fresh take built from skate.'s parts. This mod is the
@@ -29,40 +42,18 @@ Skate 3 footage, so it looks, sounds and scores the way you remember.
 
 Both can be installed: this one steps aside whenever ReSkate's is switched on, so only one shows at a time.
 
-## Download
+## Troubleshooting
 
-**[⬇ Hall-of-Meat-Complete (latest release)](https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest)**: everything in one zip, the ReSkate build with Hall of Meat and the asset pack.
+- **Nothing on a crash:** open the console (`~`) and type `hom status`. If it's an unknown command,
+  the zip's `ReSkate.dll` isn't in place: extract the zip again and start with `ReSkateLauncher.exe`.
+  If it answers, check Hall of Meat is on in the MODS tab and ReSkate's own Hall of Meat is off.
+- **Back to normal after a ReSkate update:** the official ReSkate launcher puts its own ReSkate.dll
+  back. Extract the zip again. (The launcher in the zip doesn't update itself.)
+- **No bone sounds:** no sound output device was found; plug one in and they start on their own.
+- **Bones trail the body a little:** type `hom lead 16` in the console (saved).
 
-Also on Thunderstore (the asset pack only): https://thunderstore.io/c/reskate/p/Kitty_Meow/Hall_of_Meat/
-
-## Install
-
-1. **Close the game.**
-2. **Download `Hall-of-Meat-Complete-<version>.zip`** from the
-   [latest release](https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest).
-3. **Extract it into your skate. folder** (where `Skate.exe` is; on Steam: right-click skate. >
-   Manage > Browse local files). Say yes to replacing `ReSkateLauncher.exe` and `ReSkate.dll`.
-   You end up with `Mods\Hall_of_Meat\` next to `Skate.exe`.
-4. **Start the game with `ReSkateLauncher.exe`.** In game, keep ReSkate's own Hall of Meat off
-   (Custom Stuff > Player > Hall of Meat): this one steps aside while that one is on.
-5. Bail.
-
-Got the asset pack from Thunderstore instead? You still need step 3's `ReSkateLauncher.exe` and
-`ReSkate.dll` (from the same zip, or `ReSkate-HallOfMeat-<version>.zip`) until official ReSkate
-includes Skate 3 Hall of Meat.
-
-Turn it off by switching Hall of Meat off in the MODS tab (in game: Insert > MODS).
-
-**Console (`~`):** `hom status` shows it is running and your best bail; `hom lead <ms>` pulls the
-X-ray ahead if the bones ever trail the body (saved).
-
-**Troubleshooting**
-- *Nothing on a crash:* type `hom status`. If the command is unknown, your ReSkate.dll is not this
-  build (step 3). If it answers, check `Mods\Hall_of_Meat\` is there and switched on in MODS (step 3) and ReSkate's own
-  Hall of Meat is off (step 4).
-- *Back to normal after a ReSkate update:* the official launcher puts back the official ReSkate.dll;
-  extract the zip again (until official ReSkate includes it). This launcher does not update itself.
-- *No bone sounds:* no sound output device was found; plug one in and they start on their own.
+Thunderstore has the mod part on its own: https://thunderstore.io/c/reskate/p/Kitty_Meow/Hall_of_Meat/
+(it still needs the ReSkate from the zip above until official ReSkate includes Skate 3 Hall of Meat).
 
 ## What is in it
 
