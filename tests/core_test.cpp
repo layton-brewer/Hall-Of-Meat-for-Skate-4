@@ -345,6 +345,20 @@ int main() {
         std::printf("     cars %d points %d\n", m.t.live().car_count, m.t.live().car_points);
         failures += check("car bonus: 2,000 a car, apart by its gap", one && m.t.live().car_count == 2 && m.t.live().car_points == 4000);
     }
+    {   // Trainer-boosted jump off the board (11 m/s up) into a glide, landing in a long belly slide
+        // before popping back up: never shown.
+        Sim m;
+        m.run(1.0, {0, 0, 8}, 100, true, false);
+        m.run(0.2, {0, 11.2f, 8}, 201, true, false, -1, true);
+        m.run(0.4, {0, 9.0f, 9}, 504, true, false, -1, true);
+        m.run(0.05, {0, 0, 4}, 504, false, true);
+        bool shown = false;
+        for (int i = 0; i < 132; ++i) { m.run(1.0 / 60, {0, -5, 12}, 504, false, true); shown = shown || m.t.showing(); }
+        m.run(1.0 / 20, {0, -1, 6}, 504, false, true);
+        for (int i = 0; i < 72; ++i) { m.run(1.0 / 60, {0, 0, 5}, 504, false, true); shown = shown || m.t.showing(); }
+        m.run(0.5, {0, 0, 5}, 103, true, false);
+        failures += check("a boosted glide's long belly slide is never shown as a crash", !shown && m.t.phase() != Phase::bailing);
+    }
     // Skate 3's graphs against the original's HUD readings.
     failures += check("bail 7.10 s pays 7,750", metric_points(3, 7.10f) == 7750);
     failures += check("drop 31.5 m pays ~5,750", std::abs(metric_points(2, 31.5f) - 5750) <= 10);
