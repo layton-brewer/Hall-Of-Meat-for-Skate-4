@@ -81,12 +81,12 @@ shot('Low grind -> Skate 3 rail_far: 2.5 m, 15 deg up, looking down at the board
 shot('Low manual -> between Skate 3 close_manual and far_manual: 1.6 m, level, tilted 5 deg up, 15 deg to the side',
      'bf2c5669-333f-4653-914e-93810f96c82a', '63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc',
      distance=1.6, elevation=0, look_down=-5, yaw=-15, x=-0.5)
-shot('Low big air -> Skate 3 air_big: pulled back to 4 m, 15 deg up, tilted 5 deg up at the skater',
+shot('Low big air -> Skate 3 air_big pulled back to 4 m, camera level with you looking up 10 deg (under the board)',
      '94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2', 'edda6f1b-95a0-4fe3-90d4-55219cc58e3c',
-     distance=4.0, elevation=15, look_down=-5)
+     distance=4.0, elevation=0, look_down=-10)
 shot('Low big air (second framing)',
      'b34dbebc-9b64-4f7b-9384-56c7f3a6d16a', '53965c6e-3e26-4c91-b46f-e491fd82f274',
-     distance=4.0, elevation=15, look_down=-5)
+     distance=4.0, elevation=0, look_down=-10)
 # High camera (ONCH_*): the orbit already supplies the 27 deg; Skate 3's high shots set the distance.
 shot('High manual -> Skate 3 high_manual: 2.25 m, 19 deg up, looking down at the skater (the manual state levels the orbit)',
      'd9f51af0-d17e-4c3e-a8f2-942280b5ebf3', '61b1b0b3-5b7f-4688-a00e-65fb8d27f783',

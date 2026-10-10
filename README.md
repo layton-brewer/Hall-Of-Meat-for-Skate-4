@@ -17,7 +17,7 @@ the body, every hurt bone glowing orange and every break burning red as it happe
    Manage > Browse local files). Say yes to replacing files.
 3. Start the game with `ReSkateLauncher.exe`, and bail.
 
-That's everything: the zip has ReSkate (official v2.0.1, so multiplayer works) with Hall of Meat
+That's everything: the zip has ReSkate (official v2.0.2, so multiplayer works) with Hall of Meat
 built in, and the Hall of Meat mod. In game, keep ReSkate's own Hall of Meat off (Custom Stuff >
 Player > Hall of Meat). To switch Hall of Meat off, turn it off in the MODS tab (Insert > MODS).
 
@@ -51,7 +51,7 @@ Skate 3 footage, so it looks, sounds and scores the way you remember.
 | Slow motion on a break | yes (single player), as Skate 3's `IsBrokenBoneSlowMo` | yes (single player) |
 | Car hits | Skate 3's car bonus (2,000 a car) with its chip | count half again |
 | Each map's best | yes | yes |
-| Multiplayer | yes (built on ReSkate v2.0.1) | yes |
+| Multiplayer | yes (built on ReSkate v2.0.2) | yes |
 
 Both can be installed: this one steps aside whenever ReSkate's is switched on, so only one shows at a time.
 
@@ -92,7 +92,7 @@ Thunderstore has the mod part on its own: https://thunderstore.io/c/reskate/p/Ki
 | Folder | Contents |
 |---|---|
 | `mod/` | The Thunderstore asset pack: manifest, README, changelog, icon, and `HallOfMeat/` (Skate 3's art, X-ray meshes, sounds, fonts). |
-| `source/` | A snapshot of `Extension/Skate3HallOfMeat/` from the fork (the live code is in [layton-brewer/ReSkate-Hall-Of-Meat](https://github.com/layton-brewer/ReSkate-Hall-Of-Meat/tree/skate3-hom-2.0.1)). |
+| `source/` | A snapshot of `Extension/Skate3HallOfMeat/` from the fork (the live code is in [layton-brewer/ReSkate-Hall-Of-Meat](https://github.com/layton-brewer/ReSkate-Hall-Of-Meat/tree/skate3-hom-2.0.2)). |
 | `tests/` | `core_test.cpp`: offline checks of the crash detection and scoring, many rebuilt from test-video logs. |
 | `tools/` | The Skate 3 research tools: XEX decryption, EA APT script disassembly, attribute vault reader and name hashing, EA-XMA sound decoding, texture and mesh export. |
 | `docs/` | `HOM-FINDINGS.md`: what Skate 3's files say about Hall of Meat. |

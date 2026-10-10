@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.3.0
+Fixes from player reports:
+- Low camera is low again: Skate 3's low chase cam (2 m straight behind, level), centred. 1.2.x raised it and could jump to a different height right after switching from the high camera.
+- Landing on a slope keeps the camera nearer level instead of tipping down with the slope.
+- In the air the camera follows you up less, so the board rises above it, like Skate 3. Big air looks up at you from level with you.
+- High camera: no longer changes its starting pitch (steady-state look is unchanged).
+
 ## 1.2.1
 - Grinds keep you in the middle of the picture like Skate 3's rail cam; manuals only slightly off to the side.
 

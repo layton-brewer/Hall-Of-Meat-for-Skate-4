@@ -62,3 +62,9 @@ Pack is stamped for Skate.exe sha256 fbce74d5...; rebuild when the game updates.
 ## 1.2.1: test 2 review
 - Low cam matches Skate 3 now (higher, looking down, centred); high manuals fixed.
 - Grind framing lateral x -1.5 -> 0, low manual -1.5 -> -0.5 (skater sat right of centre).
+
+## 1.3.0 (edits_1.3.0.txt): player reports
+- Low pitch default edits removed: ONCL ground/landing blends rewrite onboard_low_unifiedpitch (base 0 + slope curve) right after a camera switch; the high ones use base -12. Low framing back to Skate 3 low (2 m, level, pivot 0.85), centred.
+- Landing: slope->pitch curves of ONCL_Landing (a1d68f0) and ONCH_Landing (b1bb9af) scaled x0.4 (gen_landing.py).
+- Air: onboard_low/high_stabilizermaxup 0.1/0.2 -> 1.0/0.8 so the skater rises above the camera; low big air at level, looking up 10.
+- Not verified in game. FPS drops reported by one player: suspects fisheye and the 80 deg FOV.

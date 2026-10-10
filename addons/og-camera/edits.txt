@@ -79,37 +79,34 @@ set 69c28e99-ad82-4428-9b7b-b230c6124481 FOV.Variable null
 set 69c28e99-ad82-4428-9b7b-b230c6124481 EnableFOVCameraFramingScaling.Value false
 set 69c28e99-ad82-4428-9b7b-b230c6124481 EnableFOVCameraFramingScaling.Variable null
 
-# Low: matched to Skate 3 footage: camera about 1.8 m up and 2.2 m back, looking down 14 degrees at the
-# skater's shoulders, skater centred (Skate 3's chase is straight behind, heading 180).
+# Low: Skate 3's low chase cam, centred: 2 m straight behind, level (stock skate. height and pitch).
+# 1.2.x raised it and tilted its start pitch, but skate.'s ground state recomputes the pitch right after
+# you switch cameras, so it jumped; and players expect the low cam to be low.
 asset gameplay/cameras/framingsets/onboardlowcameraframing
-set 735dbef9-2eff-4b2c-a09e-964767383466 LocalPivotOffset.y 1.25
 set 1806dc17-41ac-4e54-9333-a8e5172b10e8 LocalPositionOffset.Value.x 0
-set 1806dc17-41ac-4e54-9333-a8e5172b10e8 LocalPositionOffset.Value.z 2.3
+set 1806dc17-41ac-4e54-9333-a8e5172b10e8 LocalPositionOffset.Value.z 2.0
 set c9d5f04c-badb-4abc-aced-414c40556274 LocalPositionOffset.Value.x 0
-set c9d5f04c-badb-4abc-aced-414c40556274 LocalPositionOffset.Value.z 2.4
+set c9d5f04c-badb-4abc-aced-414c40556274 LocalPositionOffset.Value.z 2.1
 set 055afc8f-378c-4171-94cf-a151c5c945c2 LocalPositionOffset.Value.x 0
-set 055afc8f-378c-4171-94cf-a151c5c945c2 LocalPositionOffset.Value.z 2.4
+set 055afc8f-378c-4171-94cf-a151c5c945c2 LocalPositionOffset.Value.z 2.1
 set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[0].PositionOffset.Value.x 0
-set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[0].PositionOffset.Value.z 2.4
+set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[0].PositionOffset.Value.z 2.1
 set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[1].PositionOffset.Value.x 0
-set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[1].PositionOffset.Value.z 2.3
+set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[1].PositionOffset.Value.z 2.0
 set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[2].PositionOffset.Value.x 0
-set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[2].PositionOffset.Value.z 2.4
-asset gameplay/cameras/variables/camerafloatvariable_onboardlow_defaultpitch
-set 84abb6e1-6a11-41a2-8ddc-3a08044fd18e DefaultValue -14
-asset gameplay/cameras/variables/camerafloatvariable_onboard_low_unifiedpitch
-set e1a19338-5f03-49af-af60-b8dbdc595868 DefaultValue -14
+set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[2].PositionOffset.Value.z 2.1
 
-# High: Skate 3 high_chase is 3 m out at 30 degrees up, aimed 3 degrees above the subject.
+# High: centred, 3 m out. Its pitch comes from skate.'s own ground state (-12 plus the slope), left alone.
 asset gameplay/cameras/framingsets/onboardhighcameraframing
 set 2e8685ae-2bf3-4521-8b88-927101324462 LocalPositionOffset.Value.x 0
 set 8c520ca8-292b-434c-a3cf-5591b8d13082 YawSlices[0].Framings[0].PositionOffset.Value.x 0
-asset gameplay/cameras/variables/camerafloatvariable_onboardhigh_defaultpitch
-set 54ea6f78-0efe-4464-a8d6-8afd32186760 DefaultValue -27
-asset gameplay/cameras/variables/camerafloatvariable_onboard_high_unifiedpitch
-set e85e0fab-857d-4a16-ad1a-88c69d05b8ba DefaultValue -27
-asset gameplay/cameras/variables/camerafloatvariable_onboard_high_ideallocalpitch
-set f873b9f1-188d-4875-9694-3f516c7f50b7 DefaultValue -27
+
+# In the air Skate 3's camera barely follows you up (its elevation smoothing is 0.95), so the board rises
+# above the camera. skate. keeps the skater within 0.1 m (low) or 0.2 m (high) of the camera's height.
+asset gameplay/cameras/variables/camerafloatvariable_onboard_low_stabilizermaxup
+set b29c15d0-39df-4b4e-9992-e34d149f51cf DefaultValue 1.0
+asset gameplay/cameras/variables/camerafloatvariable_onboard_high_stabilizermaxup
+set 5a02781c-c9ca-441c-b95a-64db14f03e7e DefaultValue 0.8
 
 # Swing: Skate 3's heading tracker (spring 400, damping 100, smoothing 0.87) settles in about 0.25 s,
 # where skate.'s follow damping of 25 settles in 0.04 s.
@@ -240,36 +237,36 @@ set bf2c5669-333f-4653-914e-93810f96c82a LocalRotationOffset.Value.y -15
 set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].RotationOffset.Value.y -15
 set bf2c5669-333f-4653-914e-93810f96c82a LocalPositionOffset.Value.x -0.5
 set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].PositionOffset.Value.x -0.5
-# Low big air -> Skate 3 air_big: pulled back to 4 m, 15 deg up, tilted 5 deg up at the skater
+# Low big air -> Skate 3 air_big pulled back to 4 m, camera level with you looking up 10 deg (under the board)
 asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b076a5c_ag
-set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.y 1.035
-set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.y 1.035
-set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.z 3.864
-set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.z 3.864
-set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalRotationOffset.Value.x 5
-set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].RotationOffset.Value.x 5
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.y 0.0
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.y 0.0
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.z 4.0
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.z 4.0
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalRotationOffset.Value.x 10
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].RotationOffset.Value.x 10
 asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b076a5c_ag_commandactiondata_0_onbegin
-set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.y 1.035
-set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.y 1.035
-set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.z 3.864
-set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.z 3.864
-set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalRotationOffset.Value.x 5
-set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].RotationOffset.Value.x 5
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.y 0.0
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.y 0.0
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.z 4.0
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.z 4.0
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalRotationOffset.Value.x 10
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].RotationOffset.Value.x 10
 asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b076a5c_ag_commandactiondata_2_onend
-set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.y 1.035
-set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.y 1.035
-set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.z 3.864
-set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.z 3.864
-set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalRotationOffset.Value.x 5
-set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].RotationOffset.Value.x 5
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.y 0.0
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.y 0.0
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.z 4.0
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.z 4.0
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalRotationOffset.Value.x 10
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].RotationOffset.Value.x 10
 # Low big air (second framing)
 asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b076a5c_ag
-set b34dbebc-9b64-4f7b-9384-56c7f3a6d16a LocalPositionOffset.Value.y 1.035
-set 53965c6e-3e26-4c91-b46f-e491fd82f274 YawSlices[0].Framings[0].PositionOffset.Value.y 1.035
-set b34dbebc-9b64-4f7b-9384-56c7f3a6d16a LocalPositionOffset.Value.z 3.864
-set 53965c6e-3e26-4c91-b46f-e491fd82f274 YawSlices[0].Framings[0].PositionOffset.Value.z 3.864
-set b34dbebc-9b64-4f7b-9384-56c7f3a6d16a LocalRotationOffset.Value.x 5
-set 53965c6e-3e26-4c91-b46f-e491fd82f274 YawSlices[0].Framings[0].RotationOffset.Value.x 5
+set b34dbebc-9b64-4f7b-9384-56c7f3a6d16a LocalPositionOffset.Value.y 0.0
+set 53965c6e-3e26-4c91-b46f-e491fd82f274 YawSlices[0].Framings[0].PositionOffset.Value.y 0.0
+set b34dbebc-9b64-4f7b-9384-56c7f3a6d16a LocalPositionOffset.Value.z 4.0
+set 53965c6e-3e26-4c91-b46f-e491fd82f274 YawSlices[0].Framings[0].PositionOffset.Value.z 4.0
+set b34dbebc-9b64-4f7b-9384-56c7f3a6d16a LocalRotationOffset.Value.x 10
+set 53965c6e-3e26-4c91-b46f-e491fd82f274 YawSlices[0].Framings[0].RotationOffset.Value.x 10
 # High manual -> Skate 3 high_manual: 2.25 m, 19 deg up, looking down at the skater (the manual state levels the orbit)
 asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/aea49a4_ag
 set d9f51af0-d17e-4c3e-a8f2-942280b5ebf3 LocalPositionOffset.Value.y 0.733
@@ -302,3 +299,27 @@ set 91e1dc34-827f-4b3c-aed2-0679bee5a232 YawSlices[0].Framings[0].PositionOffset
 asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/ba1b9e8_ag_commandactiondata_2_onend
 set ecd85611-c2fd-491f-8bc4-5f65e207c929 LocalPositionOffset.Value.z 5.0
 set 91e1dc34-827f-4b3c-aed2-0679bee5a232 YawSlices[0].Framings[0].PositionOffset.Value.z 5.0
+# low landing: a1d68f0_ag
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/a1d68f0_ag
+set #25 Points[0].Y -30.0
+set #25 Points[1].Y 18.0
+# low landing: a1d68f0_ag_commandactiondata_0_onbegin
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/a1d68f0_ag_commandactiondata_0_onbegin
+set #4 Points[0].Y -30.0
+set #4 Points[1].Y 18.0
+# low landing: a1d68f0_ag_commandactiondata_2_onend
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/a1d68f0_ag_commandactiondata_2_onend
+set #5 Points[0].Y -30.0
+set #5 Points[1].Y 18.0
+# high landing: b1bb9af_ag
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b1bb9af_ag
+set #41 Points[0].Y -30.0
+set #41 Points[1].Y 4.0
+# high landing: b1bb9af_ag_commandactiondata_0_onbegin
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b1bb9af_ag_commandactiondata_0_onbegin
+set #17 Points[0].Y -30.0
+set #17 Points[1].Y 4.0
+# high landing: b1bb9af_ag_commandactiondata_2_onend
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b1bb9af_ag_commandactiondata_2_onend
+set #14 Points[0].Y -30.0
+set #14 Points[1].Y 4.0
