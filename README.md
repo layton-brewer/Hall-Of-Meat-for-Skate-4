@@ -21,6 +21,19 @@ That's everything: the zip has ReSkate (official v2.0.1, so multiplayer works) w
 built in, and the Hall of Meat mod. In game, keep ReSkate's own Hall of Meat off (Custom Stuff >
 Player > Hall of Meat). To switch Hall of Meat off, turn it off in the MODS tab (Insert > MODS).
 
+## Extra: OG Camera (Skate 3's camera)
+
+### [⬇ Download OG-Camera.zip](https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest/download/OG-Camera.zip)
+
+A separate mod, not part of Hall of Meat: Skate 3's camera in skate. Skate 3's 12 mm fisheye lens, its
+low and high chase cams, its lazy swing behind you, and its grind, manual and big air shots, built from
+Skate 3's camera tables and matched against Skate 3 footage. Data only, no DLL, so it works with any
+ReSkate, with or without Hall of Meat.
+
+Extract the zip into your skate. folder (it lands in `Mods/OG_Camera`), or install **OG_Camera** from
+the launcher's MODS page. Turn it off in the MODS tab to get skate.'s camera back. Details and how it
+was made: [addons/og-camera](addons/og-camera).
+
 ## Why this one
 
 ReSkate 2.0 ships a Hall of Meat of its own: a fresh take built from skate.'s parts. This mod is the
@@ -83,6 +96,7 @@ Thunderstore has the mod part on its own: https://thunderstore.io/c/reskate/p/Ki
 | `tests/` | `core_test.cpp`: offline checks of the crash detection and scoring, many rebuilt from test-video logs. |
 | `tools/` | The Skate 3 research tools: XEX decryption, EA APT script disassembly, attribute vault reader and name hashing, EA-XMA sound decoding, texture and mesh export. |
 | `docs/` | `HOM-FINDINGS.md`: what Skate 3's files say about Hall of Meat. |
+| `addons/og-camera/` | OG Camera: its README, changelog, every value it changes (`edits.txt`), the Skate 3 camera findings, and the tools that build the pack. |
 
 Hall of Meat, its art, meshes and sounds are from Skate 3 by EA Black Box; Thrasher is a trademark of
 High Speed Productions. Fan project, not affiliated with or endorsed by EA.
