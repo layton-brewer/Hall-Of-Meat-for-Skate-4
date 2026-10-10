@@ -31,6 +31,8 @@ Both can be installed: this one steps aside whenever ReSkate's is switched on, s
 
 ## Download
 
+- **Thunderstore:** https://thunderstore.io/c/reskate/p/Kitty_Meow/Hall_of_Meat/ (the asset pack)
+
 - **[Latest release](https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest)** (also on the
   [ReSkate fork](https://github.com/layton-brewer/ReSkate-Hall-Of-Meat/releases/latest)):
   - `ReSkate-HallOfMeat-<version>.zip`: ReSkateLauncher.exe and ReSkate.dll (official ReSkate v2.0.1 plus
@@ -49,7 +51,7 @@ pack** (Skate 3's bones, art and sounds).
    `ReSkateLauncher.exe` and `ReSkate.dll` from it into your skate. folder (where `Skate.exe` is),
    replacing the ones there. On Steam: right-click skate. > Manage > Browse local files.
    *Once official ReSkate ships it ([Dingo-Shenanigans/ReSkate#150](https://github.com/Dingo-Shenanigans/ReSkate/pull/150)), skip this step.*
-3. **The asset pack.** Install **Hall of Meat** from Thunderstore through the launcher's **MODS**
+3. **The asset pack.** Install **[Hall of Meat](https://thunderstore.io/c/reskate/p/Kitty_Meow/Hall_of_Meat/)** from Thunderstore through the launcher's **MODS**
    page, or download `Hall_of_Meat-<version>.zip` from the release and drag it onto the MODS page.
    Make sure it is switched on.
 4. **Start the game with `ReSkateLauncher.exe`.** In game, keep ReSkate's own Hall of Meat off
