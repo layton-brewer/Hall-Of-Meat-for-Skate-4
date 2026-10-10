@@ -359,6 +359,41 @@ int main() {
         m.run(0.5, {0, 0, 5}, 103, true, false);
         failures += check("a boosted glide's long belly slide is never shown as a crash", !shown && m.t.phase() != Phase::bailing);
     }
+    {   // Session log 19:37:12: a boosted jump, then jumping off the board mid-air while dropping at
+        // 13 m/s (the pose snaps over), and gliding on down: never shown.
+        Sim m;
+        m.run(1.0, {0, 0, 9}, 100, true, false);
+        m.run(1.2, {0, 14.5f, 12}, 201, true, false, -1, true);  // up and over the top, dropping fast
+        m.run(1.0 / 60, {0, -13.5f, 12}, 504, false, false);
+        for (int i : {9, 10, 15, 16, 17, 18}) m.s.bone_centres[i][2] -= 0.3f; // the snap
+        bool shown = false;
+        for (int i = 0; i < 90; ++i) { m.run(1.0 / 60, {0, -6, 14}, 504, false, true); shown = shown || m.t.showing(); }
+        failures += check("log 19:37: jumping off the board mid-air into a glide is never shown", !shown);
+    }
+    {   // A jolt mid-glide that looks like a slam (the fall stops for a tick or two), then gliding on.
+        Sim m;
+        m.run(1.0, {0, 0, 9}, 100, true, false);
+        m.run(0.6, {0, 10, 11}, 201, true, false, -1, true);
+        m.run(1.0 / 60, {0, 4, 11}, 504, true, false);
+        m.run(0.5, {0, -9, 14}, 504, false, true);
+        m.run(2.0 / 60, {0, -0.5f, 4}, 504, false, true);         // the jolt
+        bool shown = false;
+        for (int i = 0; i < 60; ++i) { m.run(1.0 / 60, {0, -5, 12}, 504, false, true); shown = shown || m.t.showing(); }
+        failures += check("a slam-like jolt mid-glide is never shown", !shown);
+        m.run(0.05, {0, 0, 0.3f}, 504, false, true);               // then really smashes down
+        m.run(1.0, {0, 0, 0}, 504, false, true);
+        failures += check("the glide's real smash afterwards is shown", m.t.showing());
+    }
+    {   // A real crash landing: dropping fast off a jump, the board goes and the body hits the ground.
+        Sim m;
+        m.run(1.0, {0, 0, 9}, 100, true, false);
+        m.run(0.8, {0, -13, 9}, 201, true, false);
+        m.run(1.0 / 60, {0, -13, 9}, 504, false, false);
+        m.run(1.0 / 60, {0, 0, 3}, 504, false, true);              // hits the ground
+        m.run(0.6, {0, 0, 1}, 504, false, true);
+        std::printf("     bails %d phase %d cancelled %d trig %s\n", m.bails, (int)m.t.phase(), m.t.cancelled(), m.t.trigger().c_str());
+        failures += check("a real crash landing from the air is shown within 0.6 s", m.t.showing());
+    }
     // Skate 3's graphs against the original's HUD readings.
     failures += check("bail 7.10 s pays 7,750", metric_points(3, 7.10f) == 7750);
     failures += check("drop 31.5 m pays ~5,750", std::abs(metric_points(2, 31.5f) - 5750) <= 10);
