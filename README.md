@@ -26,7 +26,8 @@ Player > Hall of Meat). To switch Hall of Meat off, turn it off in the MODS tab 
 ### [⬇ Download OG-Camera.zip](https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest/download/OG-Camera.zip)
 
 A separate mod, not part of Hall of Meat: Skate 3's camera in skate. Skate 3's 12 mm fisheye lens, its
-low and high chase cams, its lazy swing behind you, and its grind, manual and big air shots, built from
+low and high chase cams, its lazy swing behind you, its grind, manual and big air shots, a camera that
+stays nearer level when you land on a slope and that lets the board rise above it in the air, built from
 Skate 3's camera tables and matched against Skate 3 footage. Data only, no DLL, so it works with any
 ReSkate, with or without Hall of Meat.
 
@@ -95,8 +96,18 @@ Thunderstore has the mod part on its own: https://thunderstore.io/c/reskate/p/Ki
 | `source/` | A snapshot of `Extension/Skate3HallOfMeat/` from the fork (the live code is in [layton-brewer/ReSkate-Hall-Of-Meat](https://github.com/layton-brewer/ReSkate-Hall-Of-Meat/tree/skate3-hom-2.0.2)). |
 | `tests/` | `core_test.cpp`: offline checks of the crash detection and scoring, many rebuilt from test-video logs. |
 | `tools/` | The Skate 3 research tools: XEX decryption, EA APT script disassembly, attribute vault reader and name hashing, EA-XMA sound decoding, texture and mesh export. |
+| `patches/` | `skate3-hom-on-reskate-2.0.2.patch`: everything Hall of Meat changes in ReSkate v2.0.2 (the `Extension/Skate3HallOfMeat/` code and the few hooks into the overlay, console, launcher and CMake). Applies to a clean v2.0.2 checkout with `git apply`. |
+| `BUILDING.md` | How to build ReSkate with Hall of Meat, run the tests, and repackage the zips. |
 | `docs/` | `HOM-FINDINGS.md`: what Skate 3's files say about Hall of Meat. |
 | `addons/og-camera/` | OG Camera: its README, changelog, every value it changes (`edits.txt`), the Skate 3 camera findings, and the tools that build the pack. |
 
 Hall of Meat, its art, meshes and sounds are from Skate 3 by EA Black Box; Thrasher is a trademark of
 High Speed Productions. Fan project, not affiliated with or endorsed by EA.
+
+## Links
+
+- Releases (Hall-of-Meat.zip and OG-Camera.zip): https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest
+- Thunderstore, the Hall of Meat asset pack: https://thunderstore.io/c/reskate/p/Kitty_Meow/Hall_of_Meat/
+- The ReSkate fork this is built from (branch `skate3-hom-2.0.2`): https://github.com/layton-brewer/ReSkate-Hall-Of-Meat
+- Pull request to bring it into official ReSkate: https://github.com/Dingo-Shenanigans/ReSkate/pull/150
+- ReSkate: https://github.com/Dingo-Shenanigans/ReSkate

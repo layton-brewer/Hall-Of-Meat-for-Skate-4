@@ -1,0 +1,3543 @@
+diff --git a/Extension/Console/commands.cpp b/Extension/Console/commands.cpp
+index 7103eb5..84195d2 100644
+--- a/Extension/Console/commands.cpp
++++ b/Extension/Console/commands.cpp
+@@ -225,6 +225,7 @@ const Commands &game_commands() {
+         register_perf_commands(*result);
+         register_trainer_commands(*result);
+         register_hall_of_meat_commands(*result);
++        register_skate3_hom_commands(*result);
+         return result;
+     }();
+     return *registry;
+diff --git a/Extension/Console/commands.h b/Extension/Console/commands.h
+index 1afee71..87cfcf3 100644
+--- a/Extension/Console/commands.h
++++ b/Extension/Console/commands.h
+@@ -24,6 +24,7 @@ void register_multiplayer_commands(Commands &);
+ void register_perf_commands(Commands &);
+ void register_trainer_commands(Commands &);
+ void register_hall_of_meat_commands(Commands &);
++void register_skate3_hom_commands(Commands &);
+ // Runtime adapters. Invoked only by the verified game-thread dispatcher.
+ void request_debug(overlay::DebugAction, bool enabled = false, float value = 0);
+ void request_feature(overlay::OfflineFeatureGroup, bool enabled);
+diff --git a/Extension/Skate3HallOfMeat/hom_art.cpp b/Extension/Skate3HallOfMeat/hom_art.cpp
+new file mode 100644
+index 0000000..2e22b85
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_art.cpp
+@@ -0,0 +1,234 @@
++#include "hom_art.h"
++#include "Engine/Core/Log/logging.h"
++#include "Engine/Vfs/mod_list.h"
++#include <atomic>
++#include <chrono>
++#include <thread>
++#include <mutex>
++#include <Windows.h>
++#include <filesystem>
++#include <map>
++#include <string>
++#include <vector>
++#include <wincodec.h>
++#include <wrl/client.h>
++
++namespace dingosdk::overlay {
++namespace {
++using Microsoft::WRL::ComPtr;
++namespace fs = std::filesystem;
++
++struct Picture {
++    int width{}, height{};
++    std::vector<unsigned char> rgba;
++    int rect{-1};
++};
++struct Loaded {
++    std::map<std::string, Picture, std::less<>> pictures;
++    ImFontAtlas *atlas{};
++    bool filled{};
++    std::map<int, ImFont *> fonts;
++};
++Loaded &loaded() {
++    static Loaded value;
++    return value;
++}
++
++bool decode(const fs::path &path, Picture &picture) {
++    ComPtr<IWICImagingFactory> factory;
++    ComPtr<IWICBitmapDecoder> decoder;
++    ComPtr<IWICBitmapFrameDecode> frame;
++    ComPtr<IWICFormatConverter> converter;
++    UINT width{}, height{};
++    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory))) ||
++        FAILED(factory->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder)) ||
++        FAILED(decoder->GetFrame(0, &frame)) || FAILED(frame->GetSize(&width, &height)) || !width || !height || width > 1024 ||
++        height > 1024)
++        return false;
++    if (FAILED(factory->CreateFormatConverter(&converter)) ||
++        FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone, nullptr, 0,
++                                     WICBitmapPaletteTypeCustom)))
++        return false;
++    picture.width = static_cast<int>(width);
++    picture.height = static_cast<int>(height);
++    picture.rgba.resize(static_cast<std::size_t>(width) * height * 4);
++    return SUCCEEDED(converter->CopyPixels(nullptr, width * 4, static_cast<UINT>(picture.rgba.size()), picture.rgba.data()));
++}
++
++fs::path game_directory() {
++    std::wstring path(32768, L'\0');
++    const auto length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
++    if (!length || length >= path.size()) return {};
++    path.resize(length);
++    return fs::path(path).parent_path();
++}
++// The Mods folder's Hall of Meat assets, read now (slow: every mod's description).
++fs::path scan_hom_directory() noexcept;
++} // namespace
++
++fs::path hom_directory() noexcept {
++    // Asked every game tick and every frame: answered from the last scan, and the Mods folder is
++    // scanned again every 2 s on a thread of its own, never on the caller's.
++    static std::mutex mutex;
++    static fs::path found;
++    static std::chrono::steady_clock::time_point next{};
++    static std::atomic<bool> scanning{};
++    {
++        std::lock_guard lock(mutex);
++        const auto now = std::chrono::steady_clock::now();
++        if (now < next || scanning.exchange(true)) return found;
++        next = now + std::chrono::seconds(2);
++    }
++    try {
++        std::thread([] {
++            const auto result = scan_hom_directory();
++            {
++                std::lock_guard lock(mutex);
++                if (result != found)
++                    logging::log(logging::Level::info, logging::Channel::assets, "Hall Of Meat: {}.",
++                                 result.empty() ? std::string("assets not installed, off") : "assets in " + mods::ascii_path(result));
++                found = result;
++            }
++            scanning.store(false);
++        }).detach();
++    } catch (...) {
++        scanning.store(false);
++    }
++    std::lock_guard lock(mutex);
++    return found;
++}
++
++namespace {
++fs::path scan_hom_directory() noexcept {
++    fs::path result;
++    try {
++        const auto game = game_directory();
++        std::error_code error;
++        const auto list = mods::scan_mods(game);
++        if (list.issue.empty())
++            for (const auto &entry : list.entries) {
++                if (!entry.enabled || !entry.mod.outdated.empty()) continue;
++                const auto candidate = entry.mod.directory / L"HallOfMeat";
++                if (fs::is_regular_file(candidate / L"bones.bin", error)) {
++                    result = candidate;
++                    break;
++                }
++            }
++        // A mod installed by hand into a disabled slot does not count; the game folder copy is for development.
++        if (result.empty() && !game.empty() && fs::is_regular_file(game / L"HallOfMeat" / L"bones.bin", error)) result = game / L"HallOfMeat";
++    } catch (...) {
++        result.clear();
++    }
++    return result;
++}
++} // namespace
++
++std::size_t reserve_hom_art(ImFontAtlas &atlas) noexcept {
++    try {
++        auto &l = loaded();
++        l = {};
++        const auto root = hom_directory();
++        if (root.empty()) return 0;
++        const auto font_path = root / L"fonts" / L"FuturaStd-Heavy.ttf";
++        std::error_code font_error;
++        if (fs::is_regular_file(font_path, font_error)) {
++            static const ImWchar ranges[]{0x0020, 0x00FF, 0};
++            for (const int size : {22, 28, 60}) {
++                ImFontConfig config;
++                config.OversampleH = 2;
++                config.PixelSnapH = false;
++                if (auto *font = atlas.AddFontFromFileTTF(font_path.string().c_str(), static_cast<float>(size), &config, ranges))
++                    l.fonts[size] = font;
++            }
++        }
++        const auto directory = root / L"art";
++        std::error_code error;
++        if (directory.empty() || !fs::is_directory(directory, error)) return 0;
++        const auto hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
++        for (const auto &entry : fs::directory_iterator(directory, error)) {
++            if (!entry.is_regular_file() || entry.path().extension() != L".png") continue;
++            Picture picture;
++            if (!decode(entry.path(), picture)) continue;
++            const auto name = entry.path().stem().string();
++            picture.rect = atlas.AddCustomRectRegular(picture.width, picture.height);
++            l.pictures.emplace(name, std::move(picture));
++        }
++        if (SUCCEEDED(hr)) CoUninitialize();
++        {
++            // Film grain for the X-ray (Skate 3 scrolls a noise texture over the picture). Each texel is
++            // a dark or a light speck whose strength is in its alpha, so the grain roughly averages out
++            // instead of lifting the whole picture toward grey (light specks are rarer and fainter:
++            // over a dark picture they show more).
++            Picture grain;
++            grain.width = grain.height = 128;
++            grain.rgba.resize(128 * 128 * 4);
++            std::uint32_t seed = 0x9E3779B9u;
++            for (std::size_t i = 0; i < 128 * 128; ++i) {
++                seed ^= seed << 13;
++                seed ^= seed >> 17;
++                seed ^= seed << 5;
++                const unsigned noise = seed & 0xff;
++                const bool light = ((seed >> 8) & 0xff) < 90;
++                const unsigned strength = light ? noise * 2 / 5 : noise;
++                grain.rgba[i * 4] = grain.rgba[i * 4 + 1] = grain.rgba[i * 4 + 2] = light ? 230 : 0;
++                grain.rgba[i * 4 + 3] = static_cast<unsigned char>(strength * strength / 255);
++            }
++            grain.rect = atlas.AddCustomRectRegular(grain.width, grain.height);
++            l.pictures.emplace("grain", std::move(grain));
++        }
++        l.atlas = &atlas;
++        atlas.Flags |= ImFontAtlasFlags_NoPowerOfTwoHeight;
++        logging::log(logging::Level::info, logging::Channel::graphics, "Hall Of Meat: {} pictures reserved.", l.pictures.size());
++        return l.pictures.size();
++    } catch (...) {
++        loaded() = {};
++        return 0;
++    }
++}
++
++void fill_hom_art(ImFontAtlas &atlas) noexcept {
++    auto &l = loaded();
++    if (l.atlas != &atlas || l.pictures.empty()) return;
++    try {
++        unsigned char *pixels{};
++        int width{}, height{};
++        atlas.GetTexDataAsRGBA32(&pixels, &width, &height);
++        if (!pixels || width <= 0 || height <= 0) { l = {}; return; }
++        for (auto &[name, picture] : l.pictures) {
++            const auto *rect = atlas.GetCustomRectByIndex(picture.rect);
++            if (!rect || !rect->IsPacked() || rect->X + picture.width > width || rect->Y + picture.height > height) {
++                picture.rect = -1;
++                continue;
++            }
++            for (int y = 0; y < picture.height; ++y)
++                std::memcpy(pixels + ((static_cast<std::size_t>(rect->Y) + y) * width + rect->X) * 4,
++                            picture.rgba.data() + static_cast<std::size_t>(y) * picture.width * 4,
++                            static_cast<std::size_t>(picture.width) * 4);
++        }
++        atlas.TexPixelsUseColors = true;
++        l.filled = true;
++    } catch (...) {
++        l = {};
++    }
++}
++
++ImFont *hom_font(int size) noexcept {
++    const auto &l = loaded();
++    const auto it = l.fonts.find(size);
++    return it == l.fonts.end() ? nullptr : it->second;
++}
++
++bool hom_art(std::string_view name, HomArt &art) noexcept {
++    const auto &l = loaded();
++    if (!l.filled || !l.atlas || !ImGui::GetCurrentContext() || ImGui::GetIO().Fonts != l.atlas || !l.atlas->TexID) return false;
++    const auto it = l.pictures.find(name);
++    if (it == l.pictures.end() || it->second.rect < 0) return false;
++    const auto *rect = l.atlas->GetCustomRectByIndex(it->second.rect);
++    if (!rect || !rect->IsPacked()) return false;
++    art.texture = l.atlas->TexID;
++    l.atlas->CalcCustomRectUV(rect, &art.uv0, &art.uv1);
++    art.width = static_cast<float>(it->second.width);
++    art.height = static_cast<float>(it->second.height);
++    return true;
++}
++} // namespace dingosdk::overlay
+diff --git a/Extension/Skate3HallOfMeat/hom_art.h b/Extension/Skate3HallOfMeat/hom_art.h
+new file mode 100644
+index 0000000..569104d
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_art.h
+@@ -0,0 +1,31 @@
++#pragma once
++#include <cstddef>
++#include <imgui.h>
++#include <string_view>
++
++#include <filesystem>
++
++// Hall Of Meat HUD art. ReSkate ships no game data: Skate 3's art, X-ray meshes and sounds come in a
++// mod (Mods/<mod>/HallOfMeat/, see hom_directory) and the PNGs are packed into the ImGui font atlas,
++// like the chat emotes.
++namespace dingosdk::overlay {
++// Where Hall Of Meat's assets are: the HallOfMeat folder of the first enabled mod that has one (its
++// bones.bin), else <game>/HallOfMeat. Empty when there is none, and then Hall Of Meat is off.
++// Rescans the Mods folder at most every two seconds, so turning the mod off in the MODS tab
++// switches Hall Of Meat off.
++std::filesystem::path hom_directory() noexcept;
++struct HomArt {
++    ImTextureID texture{};
++    ImVec2 uv0{}, uv1{};
++    float width{}, height{};
++};
++// Render thread, before the atlas is built: reads the PNGs and reserves their room.
++std::size_t reserve_hom_art(ImFontAtlas &) noexcept;
++// After the atlas is built: copies the pixels in.
++void fill_hom_art(ImFontAtlas &) noexcept;
++// Skate 3's HUD typeface (Futura Std Heavy) at a pixel size it was baked for, or null when the
++// font files are not there. Sizes: 22, 28, 60.
++ImFont *hom_font(int size) noexcept;
++// The picture called `name` (file name without .png), or false when it is not there.
++bool hom_art(std::string_view name, HomArt &art) noexcept;
++} // namespace dingosdk::overlay
+diff --git a/Extension/Skate3HallOfMeat/hom_audio.cpp b/Extension/Skate3HallOfMeat/hom_audio.cpp
+new file mode 100644
+index 0000000..7d920d7
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_audio.cpp
+@@ -0,0 +1,180 @@
++#include "hom_audio.h"
++#include "hom_art.h"
++#include "Engine/Core/Log/logging.h"
++#include <Windows.h>
++#include <xaudio2.h>
++#include <algorithm>
++#include <chrono>
++#include <cstring>
++#include <filesystem>
++#include <fstream>
++#include <mutex>
++#include <random>
++#include <string>
++#include <vector>
++
++namespace dingosdk::skate3_hom {
++namespace {
++namespace fs = std::filesystem;
++
++struct Sound {
++    std::vector<BYTE> pcm; // 16-bit mono
++    WAVEFORMATEX format{};
++    float seconds{};
++    int set{};
++};
++
++struct Player {
++    std::mutex mutex;
++    bool loaded{}, ready{};
++    std::chrono::steady_clock::time_point retry{}; // no output device yet: try again then
++    IXAudio2 *engine{};
++    IXAudio2MasteringVoice *master{};
++    std::vector<Sound> sounds;
++    std::vector<Sound> slow; // hom_slo_mo
++    std::vector<IXAudio2SourceVoice *> voices;
++    std::mt19937 rng{20100511u};
++    std::chrono::steady_clock::time_point last{};
++};
++Player &player() {
++    static auto *p = new Player; // never destroyed: XAudio2 must not be torn down at process exit
++    return *p;
++}
++
++fs::path sounds_directory() {
++    const auto root = overlay::hom_directory();
++    return root.empty() ? fs::path{} : root / L"sounds";
++}
++
++bool load_wav(const fs::path &path, Sound &out) {
++    std::ifstream file(path, std::ios::binary);
++    std::vector<BYTE> d((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
++    if (d.size() < 44 || std::memcmp(d.data(), "RIFF", 4) || std::memcmp(d.data() + 8, "WAVE", 4)) return false;
++    std::size_t o = 12;
++    bool have_format = false;
++    while (o + 8 <= d.size()) {
++        std::uint32_t size{};
++        std::memcpy(&size, d.data() + o + 4, 4);
++        if (o + 8 + size > d.size()) break;
++        if (!std::memcmp(d.data() + o, "fmt ", 4) && size >= 16) {
++            std::memcpy(&out.format, d.data() + o + 8, 16);
++            out.format.cbSize = 0;
++            have_format = out.format.wFormatTag == WAVE_FORMAT_PCM && out.format.wBitsPerSample == 16;
++        } else if (!std::memcmp(d.data() + o, "data", 4)) {
++            out.pcm.assign(d.begin() + static_cast<std::ptrdiff_t>(o + 8), d.begin() + static_cast<std::ptrdiff_t>(o + 8 + size));
++        }
++        o += 8 + size + (size & 1);
++    }
++    if (!have_format || out.pcm.empty()) return false;
++    out.seconds = static_cast<float>(out.pcm.size()) / static_cast<float>(out.format.nAvgBytesPerSec);
++    return true;
++}
++
++bool start(Player &p) {
++    const auto dir = sounds_directory();
++    if (!p.loaded) {
++        p.loaded = true;
++        std::error_code error;
++        for (const auto &entry : fs::directory_iterator(dir, error)) {
++            const auto name = entry.path().filename().string();
++            if (entry.path().extension() != ".wav") continue;
++            if (name.rfind("hom_slo_mo_", 0) == 0) {
++                Sound sound;
++                if (load_wav(entry.path(), sound)) p.slow.push_back(std::move(sound));
++                continue;
++            }
++            if (name.rfind("HOM_Set_", 0) != 0) continue;
++            Sound sound;
++            sound.set = name.size() > 8 ? name[8] - '0' : 0;
++            if (load_wav(entry.path(), sound) && sound.seconds > 0.04f) p.sounds.push_back(std::move(sound));
++        }
++        if (p.sounds.empty()) logging::log(logging::Level::info, logging::Channel::assets, "Hall Of Meat: no bone sounds in {}.", dir.string());
++    }
++    if (p.sounds.empty()) return false;
++    HRESULT result = S_OK;
++    if (!p.engine) {
++        // XAudio2 2.9 ships with Windows 10 and later; loaded here so nothing else depends on it.
++        const auto library = LoadLibraryW(L"XAudio2_9.dll");
++        using Create = HRESULT(WINAPI *)(IXAudio2 **, UINT32, XAUDIO2_PROCESSOR);
++        const auto create = library ? reinterpret_cast<Create>(GetProcAddress(library, "XAudio2Create")) : nullptr;
++        // XAudio2 wants COM on the calling thread; the game's own mode stands if it set one.
++        (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
++        result = create ? create(&p.engine, 0, XAUDIO2_DEFAULT_PROCESSOR) : E_NOINTERFACE;
++        if (FAILED(result)) p.engine = nullptr;
++    }
++    // Fails with no sound output device (0x80070490): tried again a little later.
++    if (p.engine) result = p.engine->CreateMasteringVoice(&p.master);
++    if (FAILED(result)) {
++        p.retry = std::chrono::steady_clock::now() + std::chrono::seconds(5);
++        logging::log(logging::Level::info, logging::Channel::assets, "Hall Of Meat: no sound output ({:#x}), bone sounds wait.",
++                     static_cast<unsigned>(result));
++        return false;
++    }
++    logging::log(logging::Level::info, logging::Channel::assets, "Hall Of Meat: {} bone sounds loaded.", p.sounds.size());
++    return true;
++}
++} // namespace
++
++void play_bone_sound(float strength, bool broken) noexcept {
++    try {
++        auto &p = player();
++        std::lock_guard lock(p.mutex);
++        if (!p.ready && std::chrono::steady_clock::now() >= p.retry) p.ready = start(p);
++        if (!p.ready) return;
++        // Skate 3 spaces its HoM sounds out (aud_general.hom priorities): never a pile of them at once.
++        const auto now = std::chrono::steady_clock::now();
++        if (now - p.last < std::chrono::milliseconds(broken ? 40 : 90)) return;
++        p.last = now;
++        // Finished voices go.
++        std::erase_if(p.voices, [](IXAudio2SourceVoice *v) {
++            XAUDIO2_VOICE_STATE state{};
++            v->GetState(&state, XAUDIO2_VOICE_NOSAMPLESPLAYED);
++            if (state.BuffersQueued) return false;
++            v->DestroyVoice();
++            return true;
++        });
++        if (p.voices.size() >= 8) return;
++        // A break gets one of the long crunches, lesser damage a short knock.
++        std::vector<const Sound *> pool;
++        for (const auto &s : p.sounds)
++            if (broken ? s.seconds >= 0.25f : s.seconds < 0.25f) pool.push_back(&s);
++        if (pool.empty()) for (const auto &s : p.sounds) pool.push_back(&s);
++        const Sound &sound = *pool[std::uniform_int_distribution<std::size_t>(0, pool.size() - 1)(p.rng)];
++        IXAudio2SourceVoice *voice{};
++        if (FAILED(p.engine->CreateSourceVoice(&voice, &sound.format))) return;
++        XAUDIO2_BUFFER buffer{};
++        buffer.AudioBytes = static_cast<UINT32>(sound.pcm.size());
++        buffer.pAudioData = sound.pcm.data();
++        buffer.Flags = XAUDIO2_END_OF_STREAM;
++        voice->SetVolume(std::clamp(broken ? 1.0f : 0.35f + 0.5f * strength, 0.0f, 1.0f));
++        if (FAILED(voice->SubmitSourceBuffer(&buffer)) || FAILED(voice->Start())) {
++            voice->DestroyVoice();
++            return;
++        }
++        p.voices.push_back(voice);
++    } catch (...) {
++    }
++}
++void play_slow_motion_sound() noexcept {
++    try {
++        auto &p = player();
++        std::lock_guard lock(p.mutex);
++        if (!p.ready && std::chrono::steady_clock::now() >= p.retry) p.ready = start(p);
++        if (!p.ready || p.slow.empty()) return;
++        const Sound &sound = p.slow[std::uniform_int_distribution<std::size_t>(0, p.slow.size() - 1)(p.rng)];
++        IXAudio2SourceVoice *voice{};
++        if (FAILED(p.engine->CreateSourceVoice(&voice, &sound.format))) return;
++        XAUDIO2_BUFFER buffer{};
++        buffer.AudioBytes = static_cast<UINT32>(sound.pcm.size());
++        buffer.pAudioData = sound.pcm.data();
++        buffer.Flags = XAUDIO2_END_OF_STREAM;
++        voice->SetVolume(0.9f);
++        if (FAILED(voice->SubmitSourceBuffer(&buffer)) || FAILED(voice->Start())) {
++            voice->DestroyVoice();
++            return;
++        }
++        p.voices.push_back(voice);
++    } catch (...) {
++    }
++}
++} // namespace dingosdk::skate3_hom
+diff --git a/Extension/Skate3HallOfMeat/hom_audio.h b/Extension/Skate3HallOfMeat/hom_audio.h
+new file mode 100644
+index 0000000..d319298
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_audio.h
+@@ -0,0 +1,10 @@
++#pragma once
++
++// Skate 3's Hall Of Meat bone sounds (HOM_Set_1..5 banks, decoded to HallOfMeat/sounds/*.wav),
++// played through XAudio2 when a body part reaches a new damage level.
++namespace dingosdk::skate3_hom {
++// strength 0..1: how far up its damage levels the part went; broken: it reached the top one.
++void play_bone_sound(float strength, bool broken) noexcept;
++// Skate 3's broken-bone slow-motion whoosh (hom_slo_mo bank, HallOfMeat/sounds/hom_slo_mo_*.wav).
++void play_slow_motion_sound() noexcept;
++} // namespace dingosdk::skate3_hom
+diff --git a/Extension/Skate3HallOfMeat/hom_bones.cpp b/Extension/Skate3HallOfMeat/hom_bones.cpp
+new file mode 100644
+index 0000000..5fa450b
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_bones.cpp
+@@ -0,0 +1,246 @@
++#include "hom_bones.h"
++#include "hom_art.h"
++#include "Engine/Core/Log/logging.h"
++#include <Windows.h>
++#include <algorithm>
++#include <cmath>
++#include <cstdint>
++#include <cstring>
++#include <filesystem>
++#include <fstream>
++#include <mutex>
++#include <string>
++#include <vector>
++
++namespace dingosdk::overlay {
++namespace {
++namespace fs = std::filesystem;
++
++struct Mesh {
++    std::string name;
++    std::vector<Vec3f> positions, normals;
++    std::vector<std::array<float, 2>> uvs;
++    std::vector<std::uint16_t> indices;
++};
++struct Library {
++    std::once_flag once;
++    bool ready{};
++    std::vector<Mesh> meshes;
++};
++Library &library() {
++    static Library value;
++    return value;
++}
++
++Vec3f sub(const Vec3f &a, const Vec3f &b) { return {a[0] - b[0], a[1] - b[1], a[2] - b[2]}; }
++Vec3f add(const Vec3f &a, const Vec3f &b) { return {a[0] + b[0], a[1] + b[1], a[2] + b[2]}; }
++Vec3f mul(const Vec3f &a, float s) { return {a[0] * s, a[1] * s, a[2] * s}; }
++float dot(const Vec3f &a, const Vec3f &b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
++Vec3f cross(const Vec3f &a, const Vec3f &b) { return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]}; }
++float length(const Vec3f &a) { return std::sqrt(dot(a, a)); }
++Vec3f normalise(const Vec3f &a) {
++    const float l = length(a);
++    return l > 1e-6f ? mul(a, 1.0f / l) : Vec3f{0, 1, 0};
++}
++// An orthonormal frame: `axis` along the bone, `front` toward the body's forward, `side` = axis x front.
++struct Frame {
++    Vec3f axis, front, side;
++};
++Frame frame(const Vec3f &axis, const Vec3f &forward, const Vec3f &fallback) {
++    Frame f;
++    f.axis = normalise(axis);
++    Vec3f front = sub(forward, mul(f.axis, dot(forward, f.axis)));
++    if (length(front) < 0.2f) front = sub(fallback, mul(f.axis, dot(fallback, f.axis)));
++    f.front = normalise(front);
++    f.side = cross(f.axis, f.front);
++    return f;
++}
++
++// Where each mesh sits in Skate 3's bind pose (A-pose, Y up, facing +Z, the skater's left on +X),
++// as the same two points hom_rig.cpp publishes for the live bone.
++struct Bind {
++    Vec3f a, b;
++};
++Vec3f along(const Vec3f &from, const Vec3f &to, float metres) { return add(to, mul(normalise(sub(to, from)), metres)); }
++const std::array<Bind, 19> &binds() {
++    static const std::array<Bind, 19> value = [] {
++        const Vec3f l_shoulder{0.165f, 1.425f, -0.03f}, l_elbow{0.355f, 1.21f, -0.005f}, l_wrist{0.51f, 1.04f, 0.105f};
++        const Vec3f l_hip{0.10f, 0.95f, 0.0f}, l_knee{0.11f, 0.49f, 0.0f}, l_ankle{0.11f, 0.085f, -0.01f}, l_ball{0.11f, 0.03f, 0.11f};
++        const auto mirror = [](Vec3f v) { return Vec3f{-v[0], v[1], v[2]}; };
++        const auto mid = [](const Vec3f &a, const Vec3f &b) { return mul(add(a, b), 0.5f); };
++        std::array<Bind, 19> b{};
++        b[0] = {{0, 1.55f, 0.0f}, {0, 1.72f, 0.0f}};
++        b[1] = {{0, 1.48f, -0.01f}, {0, 1.56f, -0.01f}};
++        b[2] = {{0, 1.20f, -0.03f}, {0, 1.50f, -0.02f}};
++        b[3] = {{0, 0.98f, -0.06f}, {0, 1.20f, -0.06f}};
++        b[4] = {l_hip, mirror(l_hip)};
++        b[5] = {l_shoulder, l_elbow};
++        b[6] = {mirror(l_shoulder), mirror(l_elbow)};
++        b[7] = {l_elbow, l_wrist};
++        b[8] = {mirror(l_elbow), mirror(l_wrist)};
++        b[9] = {l_wrist, along(l_elbow, l_wrist, 0.09f)};
++        b[10] = {mirror(l_wrist), along(mirror(l_elbow), mirror(l_wrist), 0.09f)};
++        b[11] = {l_hip, l_knee};
++        b[12] = {mirror(l_hip), mirror(l_knee)};
++        b[13] = {l_knee, l_ankle};
++        b[14] = {mirror(l_knee), mirror(l_ankle)};
++        b[15] = {l_ankle, mid(l_ankle, l_ball)};
++        b[16] = {mirror(l_ankle), mid(mirror(l_ankle), mirror(l_ball))};
++        b[17] = {l_ball, along(l_ankle, l_ball, 0.07f)};
++        b[18] = {mirror(l_ball), along(mirror(l_ankle), mirror(l_ball), 0.07f)};
++        return b;
++    }();
++    return value;
++}
++
++void load() {
++    auto &lib = library();
++    const auto root = overlay::hom_directory();
++    if (root.empty()) return;
++    const auto file = root / L"bones.bin";
++    std::ifstream in(file, std::ios::binary);
++    if (!in) return;
++    const auto read = [&](void *out, std::size_t size) { return static_cast<bool>(in.read(static_cast<char *>(out), static_cast<std::streamsize>(size))); };
++    char magic[4]{};
++    std::uint32_t count{};
++    if (!read(magic, 4) || std::memcmp(magic, "HOM2", 4) || !read(&count, 4) || count != 19) return;
++    std::vector<Mesh> meshes(count);
++    for (auto &m : meshes) {
++        std::uint8_t name_length{};
++        std::uint32_t vertices{}, indices{};
++        if (!read(&name_length, 1)) return;
++        m.name.resize(name_length);
++        if (!read(m.name.data(), name_length) || !read(&vertices, 4) || vertices > 65535) return;
++        m.positions.resize(vertices);
++        m.normals.resize(vertices);
++        m.uvs.resize(vertices);
++        for (std::uint32_t i = 0; i < vertices; ++i)
++            if (!read(m.positions[i].data(), 12) || !read(m.normals[i].data(), 12) || !read(m.uvs[i].data(), 8)) return;
++        if (!read(&indices, 4) || indices > 200000 || indices % 3) return;
++        m.indices.resize(indices);
++        if (!read(m.indices.data(), indices * 2ULL)) return;
++        for (const auto index : m.indices)
++            if (index >= vertices) return;
++    }
++    // Skate 3 names its two calf meshes the wrong way round (Bones_Calf_Left sits on the skater's
++    // right). Every left/right pair is put on its own side here: the left one on +X, as binds() has
++    // it, else the bone is drawn its body's width away from its joint.
++    const auto centre_x = [](const Mesh &m) {
++        float sum = 0;
++        for (const auto &p : m.positions) sum += p[0];
++        return m.positions.empty() ? 0.0f : sum / static_cast<float>(m.positions.size());
++    };
++    for (std::size_t left = 5; left + 1 < meshes.size(); left += 2)
++        if (centre_x(meshes[left]) < 0.0f && centre_x(meshes[left + 1]) > 0.0f) std::swap(meshes[left], meshes[left + 1]);
++    lib.meshes = std::move(meshes);
++    lib.ready = true;
++    logging::log(logging::Level::info, logging::Channel::graphics, "Hall Of Meat: {} X-ray bone meshes loaded.", lib.meshes.size());
++}
++
++ImU32 scale_colour(ImU32 colour, float light, float alpha) {
++    const auto channel = [&](int shift) {
++        return static_cast<ImU32>(std::clamp(static_cast<float>((colour >> shift) & 0xff) * light, 0.0f, 255.0f));
++    };
++    return channel(IM_COL32_R_SHIFT) << IM_COL32_R_SHIFT | channel(IM_COL32_G_SHIFT) << IM_COL32_G_SHIFT |
++           channel(IM_COL32_B_SHIFT) << IM_COL32_B_SHIFT | static_cast<ImU32>(std::clamp(alpha * 255.0f, 0.0f, 255.0f)) << IM_COL32_A_SHIFT;
++}
++} // namespace
++
++bool BoneProjector::project(const Vec3f &p, ImVec2 &at, float &depth) const {
++    const auto &m = camera;
++    const float dx = p[0] - m[12], dy = p[1] - m[13], dz = p[2] - m[14];
++    depth = -(dx * m[8] + dy * m[9] + dz * m[10]);
++    if (depth < 0.1f) return false;
++    const float side = dx * m[0] + dy * m[1] + dz * m[2], height = dx * m[4] + dy * m[5] + dz * m[6];
++    at = ImVec2(centre.x + side * focal / depth, centre.y - height * focal / depth);
++    return true;
++}
++Vec3f BoneProjector::view_direction(const Vec3f &p) const { return normalise(Vec3f{p[0] - camera[12], p[1] - camera[13], p[2] - camera[14]}); }
++
++bool hom_bones_ready() noexcept {
++    auto &lib = library();
++    try {
++        std::call_once(lib.once, load);
++    } catch (...) {
++    }
++    return lib.ready;
++}
++
++void draw_hom_bone(ImDrawList *draw, const BoneProjector &projector, std::size_t index, const Vec3f &a, const Vec3f &b, const Vec3f &forward,
++                   ImU32 colour, float opacity, float core) noexcept {
++    if (!hom_bones_ready() || index >= 19) return;
++    const auto &mesh = library().meshes[index];
++    const auto &bind = binds()[index];
++    const float bind_length = length(sub(bind.b, bind.a)), live_length = length(sub(b, a));
++    if (bind_length < 1e-4f || live_length < 1e-4f || live_length > 3.0f) return;
++    const float scale = std::clamp(live_length / bind_length, 0.5f, 2.0f);
++    // Hips and other sideways bones: their axis runs across the body, so roll comes from up.
++    const Frame from = frame(sub(bind.b, bind.a), {0, 0, 1}, {0, 1, 0});
++    const Frame to = frame(sub(b, a), forward, {0, 1, 0});
++    try {
++        const std::size_t count = mesh.positions.size();
++        std::vector<ImVec2> screen(count);
++        std::vector<float> depth(count), light(count);
++        std::vector<bool> visible(count);
++        const Vec3f centre_bind = mul(add(bind.a, bind.b), 0.5f);
++        const float half = std::max(0.02f, bind_length * 0.5f);
++        std::vector<float> heat(count, 0.0f);
++        for (std::size_t i = 0; i < count; ++i) {
++            const Vec3f local = sub(mesh.positions[i], bind.a);
++            const float x = dot(local, from.axis), y = dot(local, from.front), z = dot(local, from.side);
++            const float girth = std::min(1.0f, scale);
++            const Vec3f world = add(a, add(mul(to.axis, x * scale), mul(add(mul(to.front, y), mul(to.side, z)), girth)));
++            const Vec3f &n0 = mesh.normals[i];
++            const Vec3f normal = normalise(add(add(mul(to.axis, dot(n0, from.axis)), mul(to.front, dot(n0, from.front))), mul(to.side, dot(n0, from.side))));
++            visible[i] = projector.project(world, screen[i], depth[i]);
++            // X-ray shading: edges facing away glow brighter than faces toward the camera.
++            const float facing = std::abs(dot(normal, projector.view_direction(world)));
++            light[i] = 0.82f + 0.3f * (1.0f - facing);
++            if (core > 0.0f) {
++                const float d = length(sub(mesh.positions[i], centre_bind)) / half;
++                heat[i] = core * std::clamp(1.0f - d, 0.0f, 1.0f);
++            }
++        }
++        // Far triangles first: there is no depth buffer.
++        const std::size_t triangles = mesh.indices.size() / 3;
++        std::vector<std::pair<float, std::uint32_t>> order;
++        order.reserve(triangles);
++        for (std::uint32_t t = 0; t < triangles; ++t) {
++            const auto i0 = mesh.indices[t * 3], i1 = mesh.indices[t * 3 + 1], i2 = mesh.indices[t * 3 + 2];
++            if (!visible[i0] || !visible[i1] || !visible[i2]) continue;
++            order.emplace_back(depth[i0] + depth[i1] + depth[i2], t);
++        }
++        std::sort(order.begin(), order.end(), [](const auto &l, const auto &r) { return l.first > r.first; });
++        if (order.empty()) return;
++        // Skate 3's bone map (marquee_hom diffuse) when it is in the atlas, else flat colour.
++        HomArt map;
++        const bool textured = hom_art("bone_texture", map);
++        const auto white = ImGui::GetFontTexUvWhitePixel();
++        constexpr ImU32 hot = IM_COL32(185, 50, 27, 255);
++        for (std::size_t first = 0; first < order.size(); first += 4000) {
++            const std::size_t n = std::min<std::size_t>(4000, order.size() - first);
++            draw->PrimReserve(static_cast<int>(n * 3), static_cast<int>(n * 3));
++            for (std::size_t k = 0; k < n; ++k) {
++                const auto t = order[first + k].second;
++                for (int c = 0; c < 3; ++c) {
++                    const auto i = mesh.indices[t * 3 + c];
++                    ImU32 tint = colour;
++                    if (heat[i] > 0.0f) {
++                        const float h = heat[i];
++                        const auto mix = [&](int shift) {
++                            const float x = static_cast<float>((colour >> shift) & 0xff), y = static_cast<float>((hot >> shift) & 0xff);
++                            return static_cast<ImU32>(x + (y - x) * h) << shift;
++                        };
++                        tint = mix(IM_COL32_R_SHIFT) | mix(IM_COL32_G_SHIFT) | mix(IM_COL32_B_SHIFT) | (colour & IM_COL32_A_MASK);
++                    }
++                    const auto vertex = static_cast<ImDrawIdx>(draw->_VtxCurrentIdx);
++                    const ImVec2 uv = textured ? ImVec2(map.uv0.x + (map.uv1.x - map.uv0.x) * mesh.uvs[i][0], map.uv0.y + (map.uv1.y - map.uv0.y) * mesh.uvs[i][1]) : white;
++                    draw->PrimWriteVtx(screen[i], uv, scale_colour(tint, light[i], opacity));
++                    draw->PrimWriteIdx(vertex);
++                }
++            }
++        }
++    } catch (...) {
++    }
++}
++} // namespace dingosdk::overlay
+diff --git a/Extension/Skate3HallOfMeat/hom_bones.h b/Extension/Skate3HallOfMeat/hom_bones.h
+new file mode 100644
+index 0000000..e0f6514
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_bones.h
+@@ -0,0 +1,24 @@
++#pragma once
++#include <array>
++#include <cstddef>
++#include <imgui.h>
++
++// Skate 3's X-ray bone meshes (the 19 `dem_bones_hom` models), read from <game>/HallOfMeat/bones.bin
++// (built from the player's own Skate 3 by tools/HallOfMeat). Each mesh is fitted to its live bone
++// segment and drawn as projected triangles over the ragdoll.
++namespace dingosdk::overlay {
++using Vec3f = std::array<float, 3>;
++struct BoneProjector {
++    std::array<float, 16> camera{}; // rows: right, up, back, position
++    float focal{};
++    ImVec2 centre{};
++    bool project(const Vec3f &p, ImVec2 &at, float &depth) const;
++    Vec3f view_direction(const Vec3f &p) const; // from the camera to p, normalised
++};
++// Loads the meshes on first use; false when the file is missing or unreadable.
++bool hom_bones_ready() noexcept;
++// Draws bone `index` placed on the live segment a->b, `forward` the skater's body forward (for
++// roll). `colour` is the bone's tint; `core` brightens its middle (a fracture) from 0 to 1.
++void draw_hom_bone(ImDrawList *draw, const BoneProjector &projector, std::size_t index, const Vec3f &a, const Vec3f &b,
++                   const Vec3f &forward, ImU32 colour, float opacity, float core) noexcept;
++} // namespace dingosdk::overlay
+diff --git a/Extension/Skate3HallOfMeat/hom_commands.cpp b/Extension/Skate3HallOfMeat/hom_commands.cpp
+new file mode 100644
+index 0000000..6bcf3fb
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_commands.cpp
+@@ -0,0 +1,42 @@
++#include "s3hom_hud.h"
++#include "Extension/Console/commands.h"
++
++// The `hom` console commands: Hall Of Meat status and diagnostics.
++namespace dingosdk::console {
++void register_skate3_hom_commands(Commands &registry) {
++    struct Verb {
++        const char *name, *description, *usage;
++    };
++    const Verb verbs[]{
++        {"status", "Hall Of Meat state and best bail", nullptr},
++        {"rig", "Log the skater skeleton (diagnostic)", nullptr},
++        {"phys", "Log the skater physics bodies (diagnostic)", nullptr},
++        {"lead", "carry the X-ray this many milliseconds further ahead, if the bones trail the body (saved)", "<ms>"},
++        {"roll", "X-ray bone roll from the joints (1) or from the body forward (0)", "0|1"},
++    };
++    for (const auto &verb : verbs) {
++        std::vector<Argument> arguments;
++        if (verb.usage) {
++            auto rest = argument(verb.usage, Type::text, true);
++            rest.rest = true;
++            arguments.push_back(std::move(rest));
++        }
++        auto entry = action(std::string("hom ") + verb.name, verb.description, Group::gameplay, std::move(arguments));
++        entry.run = [name = std::string(verb.name)](const Model &, const Values &values, const Output &out) {
++            std::vector<std::string> words;
++            if (!values.empty())
++                if (const auto *text = std::get_if<std::string>(&values[0])) {
++                    std::size_t start = 0;
++                    while (start < text->size()) {
++                        auto end = text->find(' ', start);
++                        if (end == std::string::npos) end = text->size();
++                        if (end > start) words.push_back(text->substr(start, end - start));
++                        start = end + 1;
++                    }
++                }
++            out(overlay::skate3_hom_command(name, words));
++        };
++        registry.add(std::move(entry));
++    }
++}
++} // namespace dingosdk::console
+diff --git a/Extension/Skate3HallOfMeat/hom_core.cpp b/Extension/Skate3HallOfMeat/hom_core.cpp
+new file mode 100644
+index 0000000..ef8823e
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_core.cpp
+@@ -0,0 +1,648 @@
++#include "hom_core.h"
++#include <algorithm>
++#include <cmath>
++#include <cstdio>
++
++namespace dingosdk::skate3_hom {
++const std::array<BodyPart, body_parts> &body_parts_table() {
++    // Copied from Skate 3's skatercollections database (the HoM scoring class's layout data): per
++    // part, its four links {part, share} and its six damage-level slots {points, impact}. Parts:
++    // 0 skull, 1 head joint, 2-5 and 6-9 the arms (hand, forearm, upper arm, shoulder), 10 chest,
++    // 11-13 the spine (ribs, middle, lower), 14-17 and 18-21 the legs (toes, foot, calf, thigh),
++    // 22 pelvis, 23 neck, 24 groin.
++    static const std::array<BodyPart, body_parts> table{{
++    {{{-1, 0.0f}, {-1, 0.0f}, {23, 0.0f}, {1, 0.5f}}, {{500, 7.0f}, {1000, 14.0f}, {0, 0.0f}, {0, 0.0f}, {5000, 21.0f}, {0, 0.0f}}}, // 0
++    {{{-1, 0.0f}, {-1, 0.0f}, {0, 0.125f}, {10, 0.5f}}, {{0, 0.0f}, {0, 0.0f}, {0, 0.0f}, {0, 0.0f}, {0, 0.0f}, {0, 0.0f}}}, // 1
++    {{{-1, 0.0f}, {-1, 0.0f}, {3, 0.25f}, {-1, 0.0f}}, {{100, 6.0f}, {250, 9.0f}, {500, 12.0f}, {750, 15.0f}, {0, 0.0f}, {1000, 18.0f}}}, // 2
++    {{{-1, 0.0f}, {-1, 0.0f}, {4, 0.25f}, {2, 0.125f}}, {{100, 9.0f}, {250, 12.0f}, {500, 15.0f}, {0, 0.0f}, {1000, 21.0f}, {0, 0.0f}}}, // 3
++    {{{-1, 0.0f}, {5, 0.25f}, {-1, 0.0f}, {3, 0.125f}}, {{100, 9.0f}, {250, 12.0f}, {500, 15.0f}, {750, 18.0f}, {1000, 21.0f}, {0, 0.0f}}}, // 4
++    {{{4, 0.125f}, {10, 0.25f}, {-1, 0.0f}, {-1, 0.0f}}, {{100, 9.0f}, {250, 12.0f}, {500, 15.0f}, {750, 18.0f}, {1000, 21.0f}, {0, 0.0f}}}, // 5
++    {{{-1, 0.0f}, {-1, 0.0f}, {7, 0.25f}, {-1, 0.0f}}, {{100, 6.0f}, {250, 9.0f}, {500, 12.0f}, {750, 15.0f}, {0, 0.0f}, {1000, 18.0f}}}, // 6
++    {{{-1, 0.0f}, {-1, 0.0f}, {8, 0.25f}, {6, 0.125f}}, {{100, 9.0f}, {250, 12.0f}, {500, 15.0f}, {0, 0.0f}, {1000, 21.0f}, {0, 0.0f}}}, // 7
++    {{{9, 0.25f}, {-1, 0.0f}, {-1, 0.0f}, {7, 0.125f}}, {{100, 9.0f}, {250, 12.0f}, {500, 15.0f}, {750, 18.0f}, {1000, 21.0f}, {0, 0.0f}}}, // 8
++    {{{10, 0.25f}, {8, 0.125f}, {-1, 0.0f}, {-1, 0.0f}}, {{100, 9.0f}, {250, 12.0f}, {500, 15.0f}, {750, 18.0f}, {1000, 21.0f}, {0, 0.0f}}}, // 9
++    {{{5, 0.25f}, {9, 0.25f}, {1, 0.125f}, {11, 0.5f}}, {{0, 0.0f}, {0, 0.0f}, {0, 0.0f}, {0, 0.0f}, {0, 0.0f}, {0, 0.0f}}}, // 10
++    {{{-1, 0.0f}, {-1, 0.0f}, {10, 0.0f}, {12, 0.25f}}, {{250, 7.0f}, {500, 10.0f}, {0, 0.0f}, {0, 0.0f}, {1000, 15.0f}, {2000, 25.0f}}}, // 11
++    {{{-1, 0.0f}, {-1, 0.0f}, {11, 0.25f}, {13, 0.25f}}, {{250, 7.0f}, {500, 10.0f}, {0, 0.0f}, {0, 0.0f}, {1000, 15.0f}, {2000, 25.0f}}}, // 12
++    {{{-1, 0.0f}, {-1, 0.0f}, {12, 0.25f}, {22, 0.25f}}, {{250, 7.0f}, {500, 10.0f}, {0, 0.0f}, {0, 0.0f}, {1000, 15.0f}, {2000, 25.0f}}}, // 13
++    {{{-1, 0.0f}, {15, 0.25f}, {-1, 0.0f}, {-1, 0.0f}}, {{100, 7.0f}, {250, 10.0f}, {0, 0.0f}, {500, 13.0f}, {750, 16.0f}, {1000, 19.0f}}}, // 14
++    {{{14, 0.125f}, {-1, 0.0f}, {16, 0.25f}, {-1, 0.0f}}, {{100, 7.0f}, {250, 10.0f}, {0, 0.0f}, {500, 16.0f}, {750, 19.0f}, {1000, 22.0f}}}, // 15
++    {{{-1, 0.0f}, {-1, 0.0f}, {17, 0.25f}, {15, 0.125f}}, {{100, 10.0f}, {250, 13.0f}, {500, 16.0f}, {750, 19.0f}, {1000, 22.0f}, {0, 0.0f}}}, // 16
++    {{{-1, 0.0f}, {22, 0.25f}, {-1, 0.0f}, {16, 0.125f}}, {{100, 10.0f}, {250, 13.0f}, {500, 16.0f}, {750, 19.0f}, {1000, 22.0f}, {0, 0.0f}}}, // 17
++    {{{19, 0.25f}, {-1, 0.0f}, {-1, 0.0f}, {-1, 0.0f}}, {{100, 7.0f}, {250, 10.0f}, {0, 0.0f}, {500, 13.0f}, {750, 16.0f}, {1000, 19.0f}}}, // 18
++    {{{-1, 0.0f}, {18, 0.125f}, {20, 0.25f}, {-1, 0.0f}}, {{100, 7.0f}, {250, 10.0f}, {500, 13.0f}, {750, 16.0f}, {0, 0.0f}, {1000, 22.0f}}}, // 19
++    {{{-1, 0.0f}, {-1, 0.0f}, {21, 0.25f}, {19, 0.125f}}, {{100, 10.0f}, {250, 13.0f}, {500, 16.0f}, {750, 19.0f}, {1000, 22.0f}, {0, 0.0f}}}, // 20
++    {{{22, 0.25f}, {-1, 0.0f}, {-1, 0.0f}, {20, 0.125f}}, {{100, 10.0f}, {250, 16.0f}, {500, 16.0f}, {750, 19.0f}, {1000, 22.0f}, {0, 0.0f}}}, // 21
++    {{{17, 0.25f}, {21, 0.25f}, {13, 0.25f}, {24, 0.0f}}, {{250, 7.0f}, {500, 10.0f}, {0, 0.0f}, {750, 16.0f}, {1000, 19.0f}, {2000, 25.0f}}}, // 22
++    {{{-1, 0.0f}, {-1, 0.0f}, {-1, 0.0f}, {0, 1.0f}}, {{500, 6.0f}, {1000, 12.0f}, {0, 0.0f}, {0, 0.0f}, {5000, 20.0f}, {0, 0.0f}}}, // 23
++    {{{-1, 0.0f}, {-1, 0.0f}, {22, 1.0f}, {-1, 0.0f}}, {{1000, 3.0f}, {2500, 5.0f}, {5000, 7.0f}, {0, 0.0f}, {10000, 14.0f}, {0, 0.0f}}}, // 24
++    }};
++    return table;
++}
++
++int level_count(std::size_t part) {
++    int n = 0;
++    for (const auto &l : body_parts_table()[part].levels) n += l.points > 0;
++    return n;
++}
++
++const std::vector<Bone> &bones() {
++    // The 19 bones of the original's X-ray skeleton (Skate 3 `dem_bones_hom`), in hom_rig.h order,
++    // with the body part each shows and the sound material Skate 3 gives it (aud_material hom_*).
++    static const std::vector<Bone> list{
++        {"Skull", "head", 0},        {"Neck", "head", 23},         {"Rib Cage", "torso", 11},   {"Lower Spine", "torso", 13},
++        {"Hips", "torso", 22},       {"Left Bicep", "arm", 4},     {"Right Bicep", "arm", 8},   {"Left Forearm", "arm", 3},
++        {"Right Forearm", "arm", 7}, {"Left Hand", "arm", 2},      {"Right Hand", "arm", 6},    {"Left Thigh", "leg", 17},
++        {"Right Thigh", "leg", 21},  {"Left Calf", "leg", 16},     {"Right Calf", "leg", 20},   {"Left Ankle", "foot", 15},
++        {"Right Ankle", "foot", 19}, {"Left Toes", "foot", 14},    {"Right Toes", "foot", 18},
++    };
++    return list;
++}
++
++namespace {
++std::uint64_t next(std::uint64_t &s) { // splitmix64
++    s += 0x9E3779B97F4A7C15ull;
++    std::uint64_t z = s;
++    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
++    z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
++    return z ^ (z >> 31);
++}
++float unit(std::uint64_t &s) { return static_cast<float>(next(s) >> 40) / static_cast<float>(1 << 24); }
++float dist(const std::array<float, 3> &a, const std::array<float, 3> &b) {
++    const float x = a[0] - b[0], y = a[1] - b[1], z = a[2] - b[2];
++    return std::sqrt(x * x + y * y + z * z);
++}
++} // namespace
++
++// Skate 3's homscoring.apt shows a metric row once its points pass the screen's threshold (speed,
++// drop and bail time 1, air 5) or once the game flags the metric; rotation, which seldom pays, shows
++// on the flag alone (the original reads "79°" with no points).
++int metric_points(int metric, float value) {
++    // Skate 3's score graphs (eight points each, from the same layout data). Checked against the
++    // original's HUD: 7.10 s of bail read 7,750, 31.5 m of drop 5,740, 65.5 km/h 6,383.
++    struct Graph {
++        float x[8], y[8];
++    };
++    static const Graph graphs[5]{
++        {{0, 719.9f, 720, 1080, 1800, 2520, 3240, 3500}, {0, 0, 750, 1250, 2500, 5000, 10000, 15000}}, // rotation, degrees
++        {{0, 1.49999f, 1.5f, 2, 2.5f, 3, 3.1f, 3.4f}, {0, 0, 750, 1250, 2500, 5000, 10000, 10000}},   // air, seconds
++        {{0, 6.99999f, 7, 10.5f, 17.5f, 30, 40, 45}, {0, 0, 750, 1250, 2500, 5000, 10000, 10000}},    // drop, metres
++        {{0, 4.999f, 5, 5.25f, 5.5f, 6, 8, 9}, {0, 0, 750, 1250, 2500, 5000, 10000, 15000}},          // bail time, seconds
++        {{0, 9.9999f, 10, 12.5f, 17.5f, 20, 45, 50}, {0, 0, 750, 2500, 5000, 10000, 10000, 10000}},   // speed, m/s
++    };
++    if (metric < 0 || metric > 4 || !(value > 0)) return 0;
++    const auto &g = graphs[metric];
++    if (value >= g.x[7]) return static_cast<int>(g.y[7]);
++    for (int k = 1; k < 8; ++k)
++        if (value < g.x[k]) return static_cast<int>(g.y[k - 1] + (g.y[k] - g.y[k - 1]) * (value - g.x[k - 1]) / (g.x[k] - g.x[k - 1]));
++    return static_cast<int>(g.y[7]);
++}
++
++bool metric_visible(const Result &r, int metric) {
++    switch (metric) {
++    case 0: return r.rotation >= 1.0f;
++    case 1: return r.air_points > 5;
++    case 2: return r.drop_points > 1;
++    case 3: return r.duration_points > 1;
++    case 4: return r.speed_points > 1;
++    }
++    return false;
++}
++
++const char *title_for(int total, std::size_t n) {
++    if (n >= 20) return "TOTAL ANNIHILATION";
++    if (n >= 12) return "SKELETAL DISASTER";
++    if (n >= 7) return "MASSIVE CARNAGE";
++    if (n >= 3) return "SERIOUS MEAT";
++    if (n >= 1) return "SNAP, CRACKLE";
++    return total > 0 ? "JUST A TUMBLE" : "NO DAMAGE";
++}
++
++std::string Tracker::watch_line() const {
++    float torso = std::max({bone_change_[2], bone_change_[3], bone_change_[4]}), any = 0;
++    for (const float c : bone_change_) any = std::max(any, c);
++    char text[240];
++    std::snprintf(text, sizeof(text), "state %u%s, speed %.1f (peak %.1f), hips %+.1f m/s, lying %d, ragdoll %d, hit torso %.1f any %.1f, fell %.2fs ago",
++                  previous_.physics_state, from_air_ ? " from the air" : "", body_speed_, recent_peak_speed_, hips_vertical_,
++                  previous_.lying ? 1 : 0, previous_.ragdoll, torso, any, fast_fall_time_ < 0 ? -1.0 : previous_.time - fast_fall_time_);
++    return text;
++}
++
++void Tracker::reset() {
++    phase_ = Phase::idle;
++    live_ = {};
++    have_previous_ = false;
++    slow_since_ = air_start_ = -1;
++}
++
++// Each bone's middle: how much speed it lost over the last ~0.13 s. A hit stops a bone, a swing only
++// turns it. Kept every tick (not only during a bail) so a crash can be recognised by its impact.
++void Tracker::track_bones(const Sample &previous, const Sample &now, double dt) {
++    const auto length = [](const std::array<float, 3> &v) { return std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]); };
++    for (std::size_t k = 0; k + 1 < bone_times_.size(); ++k) bone_times_[k] = bone_times_[k + 1];
++    bone_times_.back() = now.time;
++    bone_samples_ = std::min<int>(bone_samples_ + 1, static_cast<int>(bone_times_.size()));
++    for (std::size_t i = 0; i < 19; ++i) {
++        std::array<float, 3> v{};
++        for (std::size_t k = 0; k < 3; ++k) v[k] = static_cast<float>((now.bone_centres[i][k] - previous.bone_centres[i][k]) / dt);
++        auto &h = bone_speeds_[i];
++        for (std::size_t k = 0; k + 1 < h.size(); ++k) h[k] = h[k + 1];
++        h.back() = length(v);
++    }
++    bone_change_ = {};
++    bone_hit_ = {};
++    if (bone_samples_ < 3) return;
++    for (std::size_t i = 0; i < 19; ++i) {
++        const auto &h = bone_speeds_[i];
++        float before = 0;
++        for (std::size_t k = h.size() - static_cast<std::size_t>(bone_samples_); k + 1 < h.size(); ++k)
++            if (now.time - bone_times_[k] <= 0.13) before = std::max(before, h[k]);
++        const float change = before - h.back();
++        // Teleports and respawns move the whole body at once: not a hit.
++        if (change > 0 && change <= 60.0f) bone_change_[i] = change;
++    }
++    // Skate 3 damages the parts that take the impact, not every bone of a body that stops: a bone
++    // gets its whole loss only when it is down on the ground (within 0.3 m of the lowest bone),
++    // otherwise only what it lost beyond the body's mean (a limb or the head striking something).
++    {
++        float lowest = now.bone_centres[0][1], mean = 0;
++        for (std::size_t i = 0; i < 19; ++i) {
++            lowest = std::min(lowest, now.bone_centres[i][1]);
++            mean += bone_change_[i] / 19.0f;
++        }
++        for (std::size_t i = 0; i < 19; ++i)
++            bone_hit_[i] = now.bone_centres[i][1] - lowest < 0.3f ? bone_change_[i] : std::max(0.0f, bone_change_[i] - mean);
++        // Just after skate. switches the skater on or off the board the pose snaps over and flings the
++        // limbs: a real impact then stops the whole body, so no bone counts more than the torso lost.
++        bone_hit_raw_ = bone_hit_;
++        // (Only before a bail: those hits are kept for one that may start later. In a bail, and on
++        // the very crash that takes the skater off the board, they are the impact.)
++        if (phase_ != Phase::bailing && switch_time_ >= 0 && now.time - switch_time_ <= 0.2) {
++            const float torso = std::max({bone_change_[2], bone_change_[3], bone_change_[4]});
++            for (auto &hit : bone_hit_) hit = std::min(hit, torso);
++        }
++    }
++    float sum = 0;
++    for (std::size_t i = 0; i < 19; ++i) sum += bone_speeds_[i].back();
++    body_speed_ = sum / 19.0f;
++    const float vertical = static_cast<float>((now.bone_centres[4][1] - previous.bone_centres[4][1]) / dt);
++    hips_vertical_ += (vertical - hips_vertical_) * std::min(1.0f, static_cast<float>(dt) * 8.0f);
++    if (vertical <= -3.0f && vertical > -60.0f) fast_fall_time_ = now.time;
++    if (vertical <= -6.0f && vertical > -60.0f) hard_fall_time_ = now.time;
++    // A respawn or teleport moves the body hundreds of metres in a tick: not a speed.
++    if (body_speed_ < 80.0f) recent_peak_speed_ = std::max(body_speed_, recent_peak_speed_ - 12.0f * static_cast<float>(dt));
++    {
++        std::array<float, 3> v{};
++        for (std::size_t k = 0; k < 3; ++k) v[k] = static_cast<float>((now.bone_centres[4][k] - previous.bone_centres[4][k]) / dt);
++        const float blend = std::min(1.0f, static_cast<float>(dt) * 15.0f);
++        for (std::size_t k = 0; k < 3; ++k) {
++            const float a = static_cast<float>((v[k] - hips_velocity_[k]) / dt);
++            if (std::isfinite(a) && std::abs(a) < 500.0f) hips_accel_[k] += (a - hips_accel_[k]) * blend;
++        }
++        hips_velocity_ = v;
++        const float sideways = std::sqrt(hips_accel_[0] * hips_accel_[0] + hips_accel_[2] * hips_accel_[2]);
++        free_fall_ = hips_accel_[1] < -6.5f && hips_accel_[1] > -13.0f && sideways < 3.0f;
++        if (free_fall_) free_fall_time_ = now.time;
++    }
++}
++
++// A hit on a body part: it reaches every damage level whose impact the hit meets, and each part
++// linked to it takes its share of the hit (Skate 3's propagation, one step).
++void Tracker::hit_part(int part, float impact, double time) {
++    const auto &table = body_parts_table();
++    const auto apply = [&](int p, float x) {
++        std::array<float, 6> needed{};
++        int n = 0, reached = 0;
++        for (const auto &l : table[p].levels)
++            if (l.points > 0) needed[n++] = l.impact;
++        std::sort(needed.begin(), needed.begin() + n);
++        for (int k = 0; k < n; ++k)
++            if (x >= needed[k]) reached = k + 1;
++        if (reached <= live_.level[p]) return;
++        live_.level[p] = reached;
++        live_.events.push_back({p, reached, reached == n, x, time});
++    };
++    if (part < 0 || part >= static_cast<int>(body_parts) || impact <= 0) return;
++    apply(part, impact);
++    for (int p = 0; p < static_cast<int>(body_parts); ++p)
++        for (const auto &link : table[p].links)
++            if (link.part == part && link.weight > 0) apply(p, impact * link.weight);
++    // The X-ray's view of it.
++    const auto &list = bones();
++    for (std::size_t i = 0; i < list.size() && i < 19; ++i) {
++        const int n = level_count(static_cast<std::size_t>(list[i].part));
++        const int l = live_.level[static_cast<std::size_t>(list[i].part)];
++        live_.damage[i] = n ? static_cast<float>(l) / static_cast<float>(n) : 0.0f;
++        if (n && l == n && !is_broken_[i]) {
++            is_broken_[i] = true;
++            live_.broken.push_back({i, impact, time});
++        }
++    }
++}
++
++// During a bail: each X-ray bone's own hit lands on its body part.
++void Tracker::apply_bone_hits(const Sample &now) {
++    if (!jolt_is_impact_ && now.time - start_.time < 0.15) return; // the wipeout's own first jolt
++    const auto &list = bones();
++    for (std::size_t i = 0; i < list.size() && i < 19; ++i) {
++        const float change = bone_hit_[i];
++        if (change <= 0) continue;
++        live_.biggest_hit = std::max(live_.biggest_hit, change);
++        hit_part(list[i].part, change, now.time);
++    }
++}
++
++// Without the skeleton: a sudden loss of speed lands on a few random parts.
++void Tracker::register_impact(float drop) {
++    ++live_.impacts;
++    live_.biggest_hit = std::max(live_.biggest_hit, drop);
++    const auto &list = bones();
++    const int strikes = std::clamp(static_cast<int>(drop / 3.0f), 1, 6);
++    for (int i = 0; i < strikes; ++i) {
++        const auto index = std::min(list.size() - 1, static_cast<std::size_t>(unit(rng_) * static_cast<float>(list.size())));
++        hit_part(list[index].part, drop * (0.6f + 0.8f * unit(rng_)), previous_.time);
++    }
++}
++
++void Tracker::score(Result &r) const {
++    // Every damaged part pays the points of the highest level it reached.
++    r.bone_points = 0;
++    const auto &table = body_parts_table();
++    for (std::size_t p = 0; p < body_parts; ++p) {
++        if (r.level[p] <= 0) continue;
++        std::array<DamageLevel, 6> sorted{};
++        std::copy(std::begin(table[p].levels), std::end(table[p].levels), sorted.begin());
++        std::sort(sorted.begin(), sorted.end(), [](const DamageLevel &a, const DamageLevel &b) {
++            return (a.points > 0) != (b.points > 0) ? a.points > 0 : a.impact < b.impact;
++        });
++        r.bone_points += sorted[static_cast<std::size_t>(r.level[p] - 1)].points;
++    }
++    r.rotation_points = metric_points(0, r.rotation);
++    r.air_points = metric_points(1, r.air_time);
++    r.drop_points = metric_points(2, r.drop);
++    r.duration_points = metric_points(3, r.duration);
++    r.speed_points = metric_points(4, r.peak_speed);
++    r.total = r.bone_points + r.air_points + r.drop_points + r.duration_points + r.speed_points + r.rotation_points + r.car_points;
++    r.title = title_for(r.total, r.broken.size());
++}
++
++bool Tracker::update(const Sample &s) {
++    bool finished = false;
++    if (phase_ == Phase::finished) phase_ = Phase::idle;
++    if (s.vehicle) vehicle_time_ = s.time;
++    if (s.ragdoll == 1) seen_ragdoll_ = true;
++    // While a crash from the air waits to be confirmed, a body that keeps dropping is still flying
++    // (a glide that jolted, a jump off the board mid-air, a trainer-boosted jump): no crash yet.
++    if (phase_ == Phase::bailing && pending_until_ >= 0 && hips_velocity_[1] < -2.0f && s.ragdoll != 1) {
++        if (pending_fall_since_ < 0) pending_fall_since_ = s.time;
++    } else {
++        pending_fall_since_ = -1;
++    }
++    if (have_previous_ && previous_.physics_state != s.physics_state) {
++        const auto off = [&](std::uint32_t state) { return state == config_.wipeout_state || state == 504; };
++        if (off(previous_.physics_state) != off(s.physics_state) || s.physics_state == config_.wipeout_state) switch_time_ = s.time;
++    }
++    {
++        const double step = s.time - previous_.time;
++        if (have_previous_ && s.bones_valid && previous_.bones_valid && step > 0 && step < 0.25) {
++            track_bones(previous_, s, step);
++        } else {
++            bone_samples_ = 0;
++            bone_change_ = {};
++            bone_hit_ = {};
++        }
++    }
++    if (phase_ == Phase::idle) {
++        // A bail starts in one of two ways:
++        //  - the game's wipeout physics state, at once;
++        //  - an off-board crash: the body hits something hard (its chest or hips stop suddenly) and is
++        //    then off its feet for a moment. Many slams, and every crash taken on foot, never enter the
++        //    wipeout state. Coming off the board for a hippy jump, a plant or a dive does none of it:
++        //    there is no hit, or the skater is back on their feet at once.
++        const bool off_board = s.physics_state == config_.wipeout_state || s.physics_state == 504;
++        if (s.physics_state == 504 && have_previous_ && previous_.physics_state >= 200 && previous_.physics_state < 300) from_air_ = true;
++        if (!off_board) from_air_ = false;
++        if (s.physics_state == 504 && have_previous_ && previous_.physics_state >= 100 && previous_.physics_state < 300) {
++            left_board_time_ = s.time;
++            left_board_from_ = previous_.physics_state;
++        }
++        if (off_board && s.bones_valid && s.lying && body_speed_ > 8.0f && have_previous_) {
++            glide_time_ += static_cast<float>(s.time - previous_.time);
++            if (glide_time_ >= 0.4f) last_glide_time_ = s.time;
++        } else {
++            glide_time_ = 0;
++        }
++        // Leaving the board (or the feet): where a crash would start from.
++        const bool was_off_board = have_previous_ && (previous_.physics_state == config_.wipeout_state || previous_.physics_state == 504);
++        // Standing or walking about off the board is not the start of anything; falling upright is.
++        if (!off_board || (s.bones_valid && s.upright && std::abs(hips_vertical_) < 1.5f)) {
++            have_offboard_start_ = false;
++        } else if (!was_off_board || !have_offboard_start_) {
++            offboard_start_ = s;
++            have_offboard_start_ = true;
++            pre_air_ = 0;
++        } else if (free_fall_ && have_previous_) {
++            pre_air_ += static_cast<float>(s.time - previous_.time);
++        }
++        if (s.bones_valid && s.upright) {
++            if (upright_idle_since_ < 0) upright_idle_since_ = s.time;
++            if (s.time - upright_idle_since_ >= 0.3) armed_ = true;
++        } else {
++            upright_idle_since_ = -1;
++        }
++        if (s.bones_valid && s.lying && off_board) {
++            if (down_since_ < 0) {
++                down_since_ = s.time;
++                down_start_ = s;
++            }
++        } else {
++            down_since_ = -1;
++        }
++        {
++            float torso = std::max({bone_change_[2], bone_change_[3], bone_change_[4]}), any = 0;
++            for (const float c : bone_change_) any = std::max(any, c);
++            if (off_board && (torso >= config_.hit_torso || any >= config_.hit_any)) {
++                // The pace the body had when this hit began (it decays fast once the body stops).
++                hit_peak_ = hit_time_ >= 0 && s.time - hit_time_ < 0.25 ? std::max(hit_peak_, recent_peak_speed_) : recent_peak_speed_;
++                hit_time_ = s.time;
++            }
++            // A body that falls hard and smashes into something is a crash at that instant, as Skate 3
++            // starts its Hall of Meat on the bail: no waiting for it to lie flat.
++            // It must have landed: the fall stopped dead and the body lost much of its speed (a dive
++            // or a glide that brushes something keeps sinking and flying).
++            slam_now_ = off_board && s.bones_valid && !s.upright && hard_fall_time_ >= 0 && s.time - hard_fall_time_ <= 0.3 &&
++                        (torso >= 6.0f || (any >= 12.0f && recent_peak_speed_ >= 9.0f)) && hips_velocity_[1] > -2.0f &&
++                        body_speed_ < 0.6f * recent_peak_speed_;
++            // (A hand or foot knocking a ledge at walking pace is climbing or rolling, not a slam: skate.
++            // drives those on foot through its ragdoll too.)
++            for (std::size_t i = 0; i < 19; ++i)
++                if (bone_hit_[i] > 0 && (s.time - recent_hit_time_[i] > 3.0 || bone_hit_[i] >= recent_hit_[i])) {
++                    recent_hit_[i] = bone_hit_[i];
++                    recent_hit_time_[i] = s.time;
++                }
++        }
++        const bool wipeout = s.physics_state == config_.wipeout_state && (!have_previous_ || previous_.physics_state != config_.wipeout_state);
++        // On the ground: a spread-eagle glide or a dive is down and can jolt, but it keeps sinking.
++        const bool grounded = std::abs(hips_vertical_) < 1.5f;
++        // A crash stops the body; a glide or a dive sails on at speed whatever it brushes.
++        const bool stopping = body_speed_ < 5.0f || body_speed_ < 0.65f * recent_peak_speed_;
++        // Off the board since the air: the body must have come down onto something.
++        const bool came_down = !from_air_ || (fast_fall_time_ >= 0 && hit_time_ >= 0 && hit_time_ - fast_fall_time_ <= 0.6);
++        // Held up by something: not in free fall lately (the top of a jump is slow and level too).
++        const bool supported = (free_fall_time_ < 0 || s.time - free_fall_time_ > 0.25) && hips_velocity_[1] < 1.0f;
++        // Straight after a bail ends the next crash needs no re-arming: it carries that bail on.
++        const bool may_start = armed_ || (ended_at_ >= 0 && s.time - ended_at_ <= 1.5);
++        // Thrown down: it needs some pace behind it (a roll or a climb on foot goes down slowly).
++        const bool thrown = may_start && hit_peak_ >= 4.5f && grounded && stopping && came_down && supported && down_since_ >= 0 &&
++                            s.time - down_since_ >= config_.down_time &&
++                            hit_time_ >= 0 && s.time - hit_time_ <= 0.8 && hit_time_ >= down_since_ - 0.4;
++        // Coming off the board, skate. switches the skater's pose over in a tick or two: that jump is
++        // no impact. Crashes at that moment are the knocked-off and crash-landing cases below.
++        const bool switching = left_board_time_ >= 0 && s.time - left_board_time_ <= 0.15;
++        const bool slammed = may_start && slam_now_ && came_down && !thrown && !switching;
++        // Skate 3 starts its Hall of Meat on the bail itself. skate. takes the skater off the board at the
++        // moment of a crash, so that moment (and the next tick or two, while the hit registers) is the
++        // bail when it comes with:
++        //  - knocked off while riding: a hit to the body as the board goes (a hippy jump or stepping off
++        //    leaves upright and unhurt);
++        //  - coming down from the air onto something: still falling fast as the board goes, and hit (a
++        //    dive leaves the board slowly, or rising, and with nothing hitting it).
++        bool knocked = false, crash_landed = false;
++        if (may_start && left_board_time_ >= 0 && s.time - left_board_time_ <= 0.1 && s.physics_state == 504 && s.bones_valid) {
++            float torso = std::max({bone_change_[2], bone_change_[3], bone_change_[4]}), any = 0;
++            for (const float c : bone_change_) any = std::max(any, c);
++            if (left_board_from_ < 200) knocked = !s.upright && (torso >= 5.0f || any >= 10.0f);
++            else crash_landed = hips_vertical_ <= -12.0f && any >= 2.5f;
++        }
++        if (!wipeout && !thrown && !slammed) {
++            if (knocked) trigger_ = "knocked off";
++            else if (crash_landed) trigger_ = "crash landing";
++        }
++        if (wipeout) trigger_ = "wipeout state";
++        else if (thrown) trigger_ = "hit and down";
++        else if (slammed) trigger_ = "slam";
++        // A crash within a moment of the last bail ending (it ended while the skater was still falling,
++        // or they stood for an instant and went straight down again) is the same bail carrying on.
++        const bool resume = (wipeout || thrown || slammed || knocked || crash_landed) && ended_at_ >= 0 && s.time - ended_at_ <= 1.5;
++        if (resume) {
++            phase_ = Phase::bailing;
++            live_ = last_;
++            start_ = ended_start_;
++            turn_ = ended_turn_;
++            is_broken_ = ended_broken_;
++            armed_ = false;
++            hit_time_ = -1;
++            down_since_ = -1;
++            ended_at_ = -1;
++            went_down_ = true;
++            upright_since_ = riding_since_ = -1;
++            pending_until_ = -1;
++            frozen_ = false;
++            still_since_ = slow_since_ = air_start_ = -1;
++            left_board_time_ = -1;
++            trigger_ += " (carrying on)";
++            carried_on_ = true;
++            const auto &list = bones();
++            for (std::size_t i = 0; i < list.size() && i < 19; ++i)
++                if (s.time - recent_hit_time_[i] <= 3.0 && recent_hit_[i] > 0) hit_part(list[i].part, recent_hit_[i], recent_hit_time_[i]);
++            recent_hit_ = {};
++        } else if (wipeout || thrown || slammed || knocked || crash_landed) {
++            armed_ = false;
++            hit_time_ = -1;
++            down_since_ = -1;
++            phase_ = Phase::bailing;
++            live_ = {};
++            live_.serial = ++serial_;
++            car_awarded_ = -1e9;
++            riding_since_ = -1;
++            carried_on_ = false;
++            rng_ = 0xC0FFEEull * live_.serial + 17;
++            is_broken_.assign(bones().size(), false);
++            went_down_ = !s.upright;
++            upright_since_ = -1;
++            start_ = thrown ? down_start_ : s;
++            // The bail started where the skater left the board or their feet, if that was just now.
++            left_board_time_ = -1;
++            // Off the board from the air (a glide, a jump off mid-air), a crash is only shown once the body
++            // has stayed down: a glide's landing rides on, a jolt mid-glide keeps flying.
++            const bool gliding = last_glide_time_ >= 0 && s.time - last_glide_time_ <= 1.0;
++            pending_until_ = wipeout ? -1 : gliding ? s.time + 0.65 : from_air_ ? s.time + 0.25 : -1;
++            pending_glide_ = gliding;
++            pending_from_ = s.time;
++            // An off-board crash that skate. itself still calls under control (a hard landing on the
++            // feet, a stumble): only shown if the body goes ragdoll in the next moment.
++            pending_needs_ragdoll_ = !wipeout && seen_ragdoll_ && s.ragdoll == 0;
++            if (pending_needs_ragdoll_) pending_until_ = std::max(pending_until_, s.time + 0.3);
++            pending_fall_since_ = -1;
++            if ((thrown || slammed || knocked || crash_landed) && have_offboard_start_ && s.time - offboard_start_.time < 4.0) {
++                start_ = offboard_start_;
++                live_.air_time = pre_air_;
++            }
++            turn_ = 0;
++            slow_since_ = -1;
++            air_start_ = -1;
++            live_.peak_speed = s.speed;
++            frozen_ = false;
++            still_since_ = -1;
++            // The impact that showed this was a crash came before the bail was recognised: count it.
++            jolt_is_impact_ = !wipeout && (knocked || crash_landed);
++            if (jolt_is_impact_)
++                for (std::size_t i = 0; i < 19; ++i)
++                    if (bone_hit_raw_[i] > recent_hit_[i] || s.time - recent_hit_time_[i] > 3.0) {
++                        recent_hit_[i] = bone_hit_raw_[i];
++                        recent_hit_time_[i] = s.time;
++                    }
++            if (thrown || slammed || knocked || crash_landed) {
++                const auto &list = bones();
++                for (std::size_t i = 0; i < list.size() && i < 19; ++i) {
++                    if (s.time - recent_hit_time_[i] > 3.0 || recent_hit_[i] <= 0) continue;
++                    live_.biggest_hit = std::max(live_.biggest_hit, recent_hit_[i]);
++                    hit_part(list[i].part, recent_hit_[i], recent_hit_time_[i]);
++                }
++            }
++            recent_hit_ = {};
++        }
++    } else if (have_previous_ && pending_until_ >= 0 &&
++               ((s.physics_state >= 100 && s.physics_state < 300) || (s.physics_state >= 600 && s.physics_state < 700) ||
++                (s.bones_valid && s.upright) || (pending_fall_since_ >= 0 && s.time - pending_fall_since_ >= 0.2) ||
++                (pending_needs_ragdoll_ && s.time >= pending_until_ && s.ragdoll != 1))) {
++        // The glide landed and the skater rode or stood straight on, or the body is still dropping
++        // through the air: it was no crash (a real landing later starts one).
++        phase_ = Phase::idle;
++        live_ = {};
++        pending_until_ = -1;
++        last_glide_time_ = -1;
++        armed_ = true;
++        ++cancelled_;
++    } else if (have_previous_) {
++        // Stayed down: a crash. A glide's landing that is still sliding along on the belly (a big
++        // glide, a trainer-boosted jump) is not settled yet: it waits while the body keeps its speed,
++        // up to 2.5 s, for the skater to pop back up.
++        // A crash from the air (not a glide's landing) shows as soon as the body has stopped dropping:
++        // only one still falling has to wait out the check.
++        if (pending_until_ >= 0 && !pending_glide_ && !pending_needs_ragdoll_ && s.time - pending_from_ >= 0.03 && hips_velocity_[1] > -1.5f) pending_until_ = -1;
++        // skate. itself calls the body a ragdoll: a crash, whatever the glide checks would say.
++        if (pending_until_ >= 0 && s.ragdoll == 1 && s.time - pending_from_ >= 0.03) {
++            pending_until_ = -1;
++            pending_needs_ragdoll_ = false;
++        }
++        // A glide that ends stopped dead (a slam, not a belly slide) is a crash at once too.
++        if (pending_until_ >= 0 && pending_glide_ && !pending_needs_ragdoll_ && s.time - pending_from_ >= 0.1 && body_speed_ < 2.5f && hips_velocity_[1] > -1.5f)
++            pending_until_ = -1;
++        if (pending_until_ >= 0 && s.time >= pending_until_) {
++            const bool sliding = body_speed_ >= 2.5f && std::abs(hips_vertical_) < 1.5f && s.time - pending_from_ < 2.5;
++            pending_until_ = sliding ? s.time + 0.1 : -1;
++        }
++        // A car hit (the one that knocked the skater down counts too, a moment before the bail began).
++        if (vehicle_time_ >= 0 && s.time - vehicle_time_ <= 0.6 && vehicle_time_ - car_awarded_ >= config_.car_gap) {
++            car_awarded_ = vehicle_time_;
++            ++live_.car_count;
++            live_.car_points += config_.car_bonus;
++        }
++        const double dt = s.time - previous_.time;
++        const double elapsed = s.time - start_.time;
++        {
++            const float moving = s.bones_valid ? body_speed_ : s.speed;
++            if (moving < config_.still_speed && elapsed > 0.5) {
++                if (still_since_ < 0) still_since_ = s.time;
++                if (s.time - still_since_ >= config_.still_time) frozen_ = true;
++            } else {
++                // Once the body has stopped the bail's numbers are final, as in Skate 3: getting up
++                // (or being dragged by the ragdoll) does not count on. Falling again (off an edge it
++                // came to rest on) does: that is still the same crash.
++                still_since_ = -1;
++                if (frozen_ && s.bones_valid && (free_fall_ || hips_vertical_ < -3.0f)) frozen_ = false;
++            }
++        }
++        if (!frozen_ && dt > 0 && dt < 0.25) {
++            const float drop = previous_.speed - s.speed;
++            if (s.bones_valid && previous_.bones_valid) {
++                if (drop >= config_.impact_threshold) ++live_.impacts;
++                apply_bone_hits(s);
++            } else if (drop >= config_.impact_threshold) {
++                register_impact(drop);
++            }
++            // In the air: the board says so while riding; off it, the hips are rising or falling freely.
++            float hips_vertical = 0;
++            if (s.bones_valid && previous_.bones_valid) hips_vertical = static_cast<float>((s.bone_centres[4][1] - previous_.bone_centres[4][1]) / dt);
++            (void)hips_vertical;
++            // In the air: the board says so while riding; off it, the body is in free fall (sliding
++            // down a ramp is fast and downward too, but it is not air).
++            const bool flying = s.airborne || (s.bones_valid && free_fall_);
++            if (flying) {
++                if (air_start_ < 0) air_start_ = previous_.time;
++            } else if (air_start_ >= 0) {
++                live_.air_time += static_cast<float>(s.time - air_start_);
++                air_start_ = -1;
++            }
++        }
++        if (!frozen_) {
++            live_.distance = dist(s.position, start_.position);
++            live_.peak_speed = std::max(live_.peak_speed, s.speed);
++            live_.peak_height = std::max(live_.peak_height, s.position[1] - start_.position[1]);
++            live_.drop = std::max(live_.drop, start_.position[1] - s.position[1]);
++            float turn = s.heading - previous_.heading;
++            while (turn > 180.0f) turn -= 360.0f;
++            while (turn < -180.0f) turn += 360.0f;
++            // Only while the body is really moving: a still body's heading jitters.
++            if (dt > 0 && dt < 0.25 && (s.bones_valid ? body_speed_ : s.speed) > 1.0f) turn_ += turn;
++            // Net turn: a tumbling ragdoll's heading twitches back and forth, which must not add up.
++            live_.rotation = std::max(live_.rotation, std::abs(turn_));
++            live_.duration = static_cast<float>(elapsed);
++        } else if (air_start_ >= 0) {
++            live_.air_time += static_cast<float>(s.time - air_start_);
++            air_start_ = -1;
++        }
++        if (s.speed < config_.settle_speed) {
++            if (slow_since_ < 0) slow_since_ = s.time;
++        } else {
++            slow_since_ = -1;
++        }
++        // Lying still is not the end while the skeleton is read: the X-ray stays until the skater is up.
++        const bool settled = !s.bones_valid && slow_since_ >= 0 && s.time - slow_since_ >= config_.settle_time;
++        // With the skeleton: over once the skater is back on their feet. Without it: out of the
++        // wipeout state and slow.
++        if (s.bones_valid && !s.upright) went_down_ = true;
++        // Standing: upright and settled. Upright while still dropping (falling feet first) is not.
++        if (s.bones_valid && s.upright && std::abs(hips_vertical_) < 1.5f && !free_fall_) {
++            if (upright_since_ < 0) upright_since_ = s.time;
++        } else {
++            upright_since_ = -1;
++        }
++        // Back on the board: skate. flicks the state to the board for a moment mid-tumble too, so
++        // it has to stay there briefly.
++        if (s.physics_state >= 100 && s.physics_state < 300) {
++            if (riding_since_ < 0) riding_since_ = s.time;
++        } else {
++            riding_since_ = -1;
++        }
++        const bool riding = riding_since_ >= 0 && s.time - riding_since_ >= 0.3 && elapsed > 0.3;
++        const bool recovered = riding || (s.bones_valid ? (went_down_ && upright_since_ >= 0 && s.time - upright_since_ >= 0.4)
++                                                       : (s.physics_state != config_.wipeout_state && elapsed > 0.5 && s.speed < 2.0f));
++        if (settled || recovered || elapsed > config_.max_duration) {
++            if (air_start_ >= 0) live_.air_time += static_cast<float>(s.time - air_start_);
++            air_start_ = -1;
++            if (elapsed >= config_.min_duration) {
++                score(live_);
++                last_ = live_;
++                ended_at_ = s.time;
++                ended_start_ = start_;
++                ended_turn_ = turn_;
++                ended_broken_ = is_broken_;
++                phase_ = Phase::finished;
++                finished = true;
++            } else {
++                phase_ = Phase::idle;
++            }
++        }
++    }
++    if (phase_ == Phase::bailing) {
++        score(live_);
++        for (int k = 0; k < 5; ++k)
++            if (live_.shown_at[k] < 0 && metric_visible(live_, k)) live_.shown_at[k] = s.time;
++    }
++    previous_ = s;
++    have_previous_ = true;
++    return finished;
++}
++} // namespace dingosdk::skate3_hom
+diff --git a/Extension/Skate3HallOfMeat/hom_core.h b/Extension/Skate3HallOfMeat/hom_core.h
+new file mode 100644
+index 0000000..cdb9ee3
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_core.h
+@@ -0,0 +1,239 @@
++#pragma once
++#include <array>
++#include <cstdint>
++#include <string>
++#include <vector>
++
++// Hall Of Meat scoring core. Pure logic with no game or UI dependencies, so it can be unit tested:
++// feed it one Sample per client tick and it tracks a bail from the moment the skater wipes out
++// until they are back on their feet, breaks bones from the hits each X-ray bone takes and scores
++// the bail the way Skate 3's HUD does: 500 a bone, plus air, drop, bail time, speed and rotation.
++namespace dingosdk::skate3_hom {
++
++struct Sample {
++    double time{}; // seconds, monotonic
++    std::array<float, 3> position{};
++    float speed{};    // metres per second over the ground
++    float vertical{}; // metres per second, upward positive
++    bool airborne{};
++    std::uint32_t physics_state{};
++    float heading{}; // degrees, 0..360
++    // Middle of each X-ray bone in world space (hom_rig.h order), when the skeleton could be read.
++    bool bones_valid{};
++    bool upright{}; // head well above the hips
++    bool lying{};   // head no higher than ~0.3 m above the hips: the body is down, not crouched
++    std::array<std::array<float, 3>, 19> bone_centres{};
++    bool vehicle{}; // the body touched a car or truck
++    int ragdoll{-1}; // skate.'s own flag: 1 the body is a ragdoll (a crash), 0 under control, -1 unknown
++};
++
++// Skate 3's own HoM damage model (Sk8::Score::HoM in its attribute database): 25 body parts, each
++// with up to six damage levels (bruised up to broken), each worth points once a hit reaches its
++// impact, and links through which a part takes a share of a neighbour's hit.
++inline constexpr std::size_t body_parts = 25;
++struct DamageLevel {
++    int points;
++    float impact; // m/s a hit must reach
++};
++struct BodyLink {
++    int part;     // -1: none
++    float weight; // share of that part's hit this one takes
++};
++struct BodyPart {
++    BodyLink links[4];
++    DamageLevel levels[6]; // unused slots are {0, 0}
++};
++const std::array<BodyPart, body_parts> &body_parts_table();
++// Number of real damage levels of a part (its top one is a break).
++int level_count(std::size_t part);
++
++// The 19 bones of the X-ray, each drawn for one body part.
++struct Bone {
++    const char *name;
++    const char *region; // Skate 3's sound material: head, torso, arm, leg, foot
++    int part;           // index in body_parts_table()
++};
++const std::vector<Bone> &bones();
++
++struct BrokenBone {
++    std::size_t bone{};
++    float impact{}; // m/s of speed lost in the hit that broke it
++    double time{};  // when it broke (Sample::time)
++};
++// A body part reaching a new damage level, for the sound of it.
++struct DamageEvent {
++    int part{};
++    int level{}; // 1..level_count(part)
++    bool top{};  // broken
++    float impact{};
++    double time{};
++};
++
++struct Result {
++    std::uint32_t serial{};
++    std::vector<BrokenBone> broken;
++    // Each X-ray bone's damage level as a share of its top one (1 = broken; 0 = untouched).
++    std::array<float, 19> damage{};
++    std::array<int, body_parts> level{}; // damage level reached by each body part
++    std::vector<DamageEvent> events;
++    int impacts{};
++    float distance{};    // metres from where the bail began
++    float peak_speed{};  // m/s
++    float peak_height{}; // metres above the start of the bail
++    float air_time{};    // seconds off the ground during the bail
++    float duration{};    // seconds
++    float biggest_hit{}; // m/s
++    float drop{};     // metres below where the bail began, at its lowest
++    float rotation{}; // degrees turned about the vertical during the bail
++    // Points per row of the original HUD: the bone chip on top, then the metrics.
++    int bone_points{}, rotation_points{}, air_points{}, drop_points{}, duration_points{}, speed_points{};
++    // Skate 3's car bonus (Sk8::Score::HoM VehicleData): each car hit, apart by its gap.
++    int car_count{}, car_points{};
++    int total{};
++    std::string title;
++    // When each HUD row first appeared (rotation, air, drop, bail time, speed; -1 = not yet). The
++    // original stacks rows in that order, the first one nearest the score.
++    std::array<double, 5> shown_at{-1, -1, -1, -1, -1};
++};
++// Whether a metric has a row on the HUD yet (0 rotation, 1 air, 2 drop, 3 bail time, 4 speed).
++bool metric_visible(const Result &r, int metric);
++
++struct Config {
++    std::uint32_t wipeout_state = 300; // physics state that starts a bail
++    float impact_threshold = 3.5f;     // m/s lost between two ticks to count as a hit
++    float hit_torso = 3.5f;             // m/s the chest or hips lose in ~0.13 s: the body hit something
++    float hit_any = 9.0f;               // or any bone does (a limb slammed hard)
++    float down_time = 0.20f;            // seconds the body must be lying for an off-board bail
++    float still_speed = 1.2f;           // bones' average speed below which the body has stopped (a
++                                        // ragdoll at rest still twitches at up to ~1 m/s)
++    float still_time = 0.4f;            // for this long: the bail's score is final
++    float settle_speed = 0.6f;         // below this for settle_time ends the bail
++    float settle_time = 1.0f;
++    float min_duration = 0.4f; // shorter wipeouts are not worth scoring
++    // Skate 3's VehicleData: 2,000 a car; its 1,500 beside it read as the gap (ms) before the next.
++    int car_bonus = 2000;
++    double car_gap = 1.5;
++    float max_duration = 30.0f;
++    // The metrics pay by Skate 3's own score graphs (metric_points in hom_core.cpp).
++};
++// Points for a metric by Skate 3's score graph (0 rotation degrees, 1 air seconds, 2 drop metres,
++// 3 bail seconds, 4 speed m/s).
++int metric_points(int metric, float value);
++
++enum class Phase { idle, bailing, finished };
++
++class Tracker {
++public:
++    explicit Tracker(Config config = {}) : config_(config) {}
++    // Returns true on the tick a bail ends (result() is then valid).
++    bool update(const Sample &sample);
++    Phase phase() const { return phase_; }
++    // A bail that is on screen: not one still waiting to see whether a glide's landing was a crash.
++    bool showing() const { return phase_ == Phase::bailing && pending_until_ < 0; }
++    // The skater is getting up: upright and settled, not falling feet first (the X-ray fades then).
++    // The live bail is the previous one carrying on (a second drop straight after it).
++    bool carried_on() const { return carried_on_; }
++    bool getting_up() const { return phase_ == Phase::bailing && upright_since_ >= 0; }
++    // Bails taken back because the skater was straight back on the board or their feet.
++    int cancelled() const { return cancelled_; }
++    // Why the last bail started, for the log.
++    const std::string &trigger() const { return trigger_; }
++    const Result &live() const { return live_; }   // the bail in progress, scored so far
++    const Result &result() const { return last_; } // the last finished bail
++    void reset();
++    const Config &config() const { return config_; }
++    // Off the board and not bailing: what the crash test sees, for the log (tuning glides and dives).
++    std::string watch_line() const;
++
++private:
++    void score(Result &r) const;
++    void register_impact(float drop);
++    void hit_part(int part, float impact, double time);
++    Config config_;
++    Phase phase_{Phase::idle};
++    Result live_{}, last_{};
++    Sample previous_{}, start_{};
++    bool have_previous_{};
++    double slow_since_{-1}, air_start_{-1};
++    std::uint32_t serial_{};
++    std::uint64_t rng_{};
++    std::vector<bool> is_broken_;
++    // Each bone's recent speeds (newest last), to measure how much it lost over a short window.
++    std::array<std::array<float, 8>, 19> bone_speeds_{};
++    std::array<double, 8> bone_times_{};
++    int bone_samples_{};
++    bool went_down_{};          // the body has been off its feet during this bail
++    double upright_since_{-1};
++    void track_bones(const Sample &previous, const Sample &now, double dt);
++    void apply_bone_hits(const Sample &now);
++    std::array<float, 19> bone_change_{}; // speed each bone lost over the last ~0.13 s
++    // The part of that loss that was the bone's own hit: in full for the bones touching the ground
++    // (the lowest), else only what it lost beyond the body as a whole (it struck something).
++    std::array<float, 19> bone_hit_{};
++    double down_since_{-1}, hit_time_{-1}, upright_idle_since_{-1};
++    Sample down_start_{};
++    bool armed_{true}; // the skater has been on their feet since the last bail
++    std::string trigger_;
++    // Strongest hit each bone took in the last 3 s while not bailing, applied when a bail
++    // starts after its own impact (an off-board crash is only recognised after the hit).
++    std::array<float, 19> recent_hit_{};
++    std::array<double, 19> recent_hit_time_{};
++    float hips_vertical_{}; // smoothed up/down speed of the hips (m/s)
++    float recent_peak_speed_{}; // the body's top speed lately, decaying (m/s)
++    double fast_fall_time_{-1}; // when the hips last fell at 3 m/s or more
++    double hard_fall_time_{-1}; // ... at 6 m/s or more
++    // The hips' velocity and smoothed acceleration: in free fall the body drops at g and keeps its
++    // sideways speed, which sliding down a ramp (also fast and downward) does not.
++    std::array<float, 3> hips_velocity_{}, hips_accel_{};
++    bool free_fall_{};
++    double free_fall_time_{-1}; // when the body was last in free fall
++    // Where the skater left the board (or their feet) before a crash, and the free fall since:
++    // a slam recognised on impact still counts its fall, as Skate 3's bail starts at the bail.
++    Sample offboard_start_{};
++    bool have_offboard_start_{};
++    float pre_air_{};
++    bool slam_now_{};
++    // Gliding: off the board, flat out and fast for a while (skate.'s spread eagle and dive). A crash
++    // right after one waits pending_until_ to see the skater stay down: a glide lands with a jolt and
++    // puts the skater straight back on the board.
++    float glide_time_{};
++    double last_glide_time_{-1}, pending_until_{-1};
++    int cancelled_{};
++    // When the physics state last switched in or out of the off-board states: skate. snaps the pose
++    // over then, which flings the hands and feet, so no limb takes more than the torso's hit then.
++    double switch_time_{-1};
++    double pending_from_{-1}; // when the glide-landing wait began
++    double pending_fall_since_{-1}; // the body has kept dropping since then: still in the air
++    bool pending_glide_{};          // the wait is a glide landing's (else a crash from the air)
++    bool pending_needs_ragdoll_{};  // skate. said under control at the start: only a ragdoll makes it a crash
++    bool seen_ragdoll_{};
++    float hit_peak_{}; // the body's recent peak speed when it last hit something           // the ragdoll flag has read 1 at least once: it can be trusted
++    bool jolt_is_impact_{};         // the bail began on the impact itself (crash landing, knocked off)
++    std::array<float, 19> bone_hit_raw_{}; // this tick's hits before the board-switch cap
++    double riding_since_{-1};
++    // The last bail as it ended, so a crash straight after it (still falling, a second drop) carries
++    // on as the same bail instead of starting another.
++    double ended_at_{-1};
++    double vehicle_time_{-1}; // last tick the body touched a vehicle
++    double car_awarded_{-1e9}; // when this bail last paid a car bonus
++    bool carried_on_{};
++    Sample ended_start_{};
++    float ended_turn_{};
++    std::vector<bool> ended_broken_;
++    // The tick the skater came off the board (state 1xx or 2xx into 504) and from which, so the
++    // crash that caused it can be recognised over the next few ticks.
++    double left_board_time_{-1};
++    std::uint32_t left_board_from_{};
++    float turn_{}; // signed turn of the body during the bail (degrees); rotation is its size
++    // Off the board since leaving it in the air (a dive, a spread eagle, a jump off): only a
++    // falling impact makes that a crash, not the jolts of steering a glide.
++    bool from_air_{};
++    // Once the body has stopped moving the bail's numbers are final, like the original's
++    // wipeout-over: the X-ray stays until the skater is up, the score no longer counts.
++    bool frozen_{};
++    double still_since_{-1};
++    float body_speed_{};
++};
++
++const char *title_for(int total, std::size_t bones_broken);
++} // namespace dingosdk::skate3_hom
+diff --git a/Extension/Skate3HallOfMeat/hom_grade.cpp b/Extension/Skate3HallOfMeat/hom_grade.cpp
+new file mode 100644
+index 0000000..3c51937
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_grade.cpp
+@@ -0,0 +1,175 @@
++#include "hom_grade.h"
++#include "Engine/Core/Log/logging.h"
++#include <d3dcompiler.h>
++#include <wrl/client.h>
++#include <algorithm>
++#include <cstring>
++
++namespace dingosdk::overlay {
++namespace {
++using Microsoft::WRL::ComPtr;
++
++// Full-screen triangle; the pixel shader reads the copy of the picture texel for texel.
++constexpr char shader_source[] = R"(
++cbuffer Grade : register(b0) { float strength; float saturation; float blue; float pad; };
++Texture2D picture : register(t0);
++float4 vs(uint id : SV_VertexID) : SV_Position {
++    float2 uv = float2((id << 1) & 2, id & 2);
++    return float4(uv * float2(2, -2) + float2(-1, 1), 0, 1);
++}
++float4 ps(float4 position : SV_Position) : SV_Target {
++    float3 c = picture.Load(int3(position.xy, 0)).rgb;
++    float l = dot(c, float3(0.299, 0.587, 0.114));
++    float3 graded = lerp(float3(l, l, l), c, saturation) * float3(1.0, 1.0, blue);
++    return float4(lerp(c, graded, strength), 1.0);
++}
++)";
++
++struct Pass {
++    bool failed{};
++    ComPtr<ID3D12RootSignature> root;
++    ComPtr<ID3D12PipelineState> pipeline;
++    ComPtr<ID3D12DescriptorHeap> heap;
++    ComPtr<ID3D12Resource> copy;
++    DXGI_FORMAT format{};
++    UINT64 width{};
++    UINT height{};
++};
++Pass &pass() {
++    static Pass value;
++    return value;
++}
++
++bool fail(const char *what, HRESULT result) {
++    pass().failed = true;
++    logging::log(logging::Level::warning, logging::Channel::graphics, "Hall Of Meat: colour pass unavailable ({}, {:#x}).", what,
++                 static_cast<unsigned>(result));
++    return false;
++}
++
++bool prepare(ID3D12Device *device, const D3D12_RESOURCE_DESC &target) {
++    auto &p = pass();
++    if (p.failed) return false;
++    if (!p.root) {
++        D3D12_DESCRIPTOR_RANGE range{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, 0};
++        D3D12_ROOT_PARAMETER parameters[2]{};
++        parameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS;
++        parameters[0].Constants = {0, 0, 4};
++        parameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
++        parameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
++        parameters[1].DescriptorTable = {1, &range};
++        parameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
++        D3D12_ROOT_SIGNATURE_DESC description{2, parameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE};
++        ComPtr<ID3DBlob> blob, error;
++        HRESULT result = D3D12SerializeRootSignature(&description, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error);
++        if (FAILED(result)) return fail("root signature", result);
++        result = device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&p.root));
++        if (FAILED(result)) return fail("root signature", result);
++        D3D12_DESCRIPTOR_HEAP_DESC heap{D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE, 0};
++        result = device->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&p.heap));
++        if (FAILED(result)) return fail("descriptor heap", result);
++    }
++    if (!p.pipeline || p.format != target.Format) {
++        ComPtr<ID3DBlob> vs, ps, error;
++        HRESULT result = D3DCompile(shader_source, std::strlen(shader_source), "hom_grade", nullptr, nullptr, "vs", "vs_5_0", 0, 0, &vs, &error);
++        if (SUCCEEDED(result)) result = D3DCompile(shader_source, std::strlen(shader_source), "hom_grade", nullptr, nullptr, "ps", "ps_5_0", 0, 0, &ps, &error);
++        if (FAILED(result)) return fail("shader", result);
++        D3D12_GRAPHICS_PIPELINE_STATE_DESC state{};
++        state.pRootSignature = p.root.Get();
++        state.VS = {vs->GetBufferPointer(), vs->GetBufferSize()};
++        state.PS = {ps->GetBufferPointer(), ps->GetBufferSize()};
++        state.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
++        state.SampleMask = UINT_MAX;
++        state.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
++        state.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
++        state.RasterizerState.DepthClipEnable = TRUE;
++        state.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
++        state.NumRenderTargets = 1;
++        state.RTVFormats[0] = target.Format;
++        state.SampleDesc.Count = 1;
++        p.pipeline.Reset();
++        result = device->CreateGraphicsPipelineState(&state, IID_PPV_ARGS(&p.pipeline));
++        if (FAILED(result)) return fail("pipeline", result);
++    }
++    if (!p.copy || p.format != target.Format || p.width != target.Width || p.height != target.Height) {
++        D3D12_RESOURCE_DESC description{};
++        description.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
++        description.Width = target.Width;
++        description.Height = target.Height;
++        description.DepthOrArraySize = 1;
++        description.MipLevels = 1;
++        description.Format = target.Format;
++        description.SampleDesc.Count = 1;
++        description.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
++        D3D12_HEAP_PROPERTIES heap{D3D12_HEAP_TYPE_DEFAULT};
++        p.copy.Reset();
++        const HRESULT result = device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &description, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
++                                                               IID_PPV_ARGS(&p.copy));
++        if (FAILED(result)) return fail("picture copy", result);
++        device->CreateShaderResourceView(p.copy.Get(), nullptr, p.heap->GetCPUDescriptorHandleForHeapStart());
++        p.format = target.Format;
++        p.width = target.Width;
++        p.height = target.Height;
++    }
++    return true;
++}
++
++void transition(ID3D12GraphicsCommandList *commands, ID3D12Resource *resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after) {
++    D3D12_RESOURCE_BARRIER barrier{};
++    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
++    barrier.Transition.pResource = resource;
++    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
++    barrier.Transition.StateBefore = before;
++    barrier.Transition.StateAfter = after;
++    commands->ResourceBarrier(1, &barrier);
++}
++} // namespace
++
++std::atomic<float> &hom_colour_strength() noexcept {
++    static std::atomic<float> value{};
++    return value;
++}
++
++bool hom_grade_record(ID3D12Device *device, ID3D12GraphicsCommandList *commands, ID3D12Resource *buffer, D3D12_CPU_DESCRIPTOR_HANDLE rtv,
++                      float strength) noexcept {
++    try {
++        if (!device || !commands || !buffer || !(strength > 0.01f)) return false;
++        const auto target = buffer->GetDesc();
++        if (target.SampleDesc.Count != 1 || !prepare(device, target)) return false;
++        auto &p = pass();
++        transition(commands, buffer, D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_COPY_SOURCE);
++        commands->CopyResource(p.copy.Get(), buffer);
++        transition(commands, p.copy.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
++        transition(commands, buffer, D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET);
++        commands->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
++        const D3D12_VIEWPORT viewport{0, 0, static_cast<float>(target.Width), static_cast<float>(target.Height), 0, 1};
++        const D3D12_RECT scissor{0, 0, static_cast<LONG>(target.Width), static_cast<LONG>(target.Height)};
++        commands->RSSetViewports(1, &viewport);
++        commands->RSSetScissorRects(1, &scissor);
++        ID3D12DescriptorHeap *heaps[]{p.heap.Get()};
++        commands->SetDescriptorHeaps(1, heaps);
++        commands->SetGraphicsRootSignature(p.root.Get());
++        commands->SetPipelineState(p.pipeline.Get());
++        // Skate 3's colour_matrix_hall_of_meat: near and far saturation 0.5, multiply (1, 1, 1.2).
++        const float constants[4]{std::min(strength, 1.0f), 0.5f, 1.2f, 0.0f};
++        commands->SetGraphicsRoot32BitConstants(0, 4, constants, 0);
++        commands->SetGraphicsRootDescriptorTable(1, p.heap->GetGPUDescriptorHandleForHeapStart());
++        commands->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
++        commands->DrawInstanced(3, 1, 0, 0);
++        transition(commands, p.copy.Get(), D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE, D3D12_RESOURCE_STATE_COPY_DEST);
++        return true;
++    } catch (...) {
++        pass().failed = true;
++        return false;
++    }
++}
++
++void hom_grade_release() noexcept {
++    auto &p = pass();
++    p.copy.Reset();
++    p.pipeline.Reset();
++    p.heap.Reset();
++    p.root.Reset();
++    p.width = p.height = 0;
++}
++} // namespace dingosdk::overlay
+diff --git a/Extension/Skate3HallOfMeat/hom_grade.h b/Extension/Skate3HallOfMeat/hom_grade.h
+new file mode 100644
+index 0000000..b5e839c
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_grade.h
+@@ -0,0 +1,18 @@
++#pragma once
++#include <atomic>
++#include <d3d12.h>
++
++// Skate 3's Hall of Meat colour matrix (post_fx colour_matrix_hall_of_meat: half saturation, blue
++// x1.2) applied to the game's own picture, in the overlay's DirectX 12 pass before the HUD is drawn:
++// the overlay alone can only darken and tint, not take the colour out.
++namespace dingosdk::overlay {
++// 0..1, set by the Hall of Meat HUD each frame: how far the colour matrix applies.
++std::atomic<float> &hom_colour_strength() noexcept;
++// Records the pass into `commands`. `buffer` must be in the PRESENT state; on success it is left in
++// RENDER_TARGET with `rtv` bound (the caller then draws the HUD and returns it to PRESENT). False when
++// nothing was recorded (the caller does its own PRESENT -> RENDER_TARGET barrier then).
++bool hom_grade_record(ID3D12Device *device, ID3D12GraphicsCommandList *commands, ID3D12Resource *buffer,
++                      D3D12_CPU_DESCRIPTOR_HANDLE rtv, float strength) noexcept;
++// Drops the pass's GPU objects (with the overlay's own graphics teardown).
++void hom_grade_release() noexcept;
++} // namespace dingosdk::overlay
+diff --git a/Extension/Skate3HallOfMeat/hom_rig.cpp b/Extension/Skate3HallOfMeat/hom_rig.cpp
+new file mode 100644
+index 0000000..b175879
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_rig.cpp
+@@ -0,0 +1,452 @@
++#include "hom_rig.h"
++#include "Engine/Core/Log/logging.h"
++#include "Extension/Multiplayer/Remote/native_pose_layout.h"
++#include "Extension/Multiplayer/Remote/native_skater.h"
++#include "Extension/Skater/client_source_spawn_internal.h"
++#include "Engine/Game/Build/20260929/client_source_spawn.h"
++#include "Extension/Profile/local_profile_runtime.h"
++#include "Extension/Skater/no_bail.h"
++#include "Engine/Game/Build/addresses.h"
++#include "Engine/Game/Build/20260929/skater_body.h"
++#include "Engine/Game/Build/20260929/skater_state.h"
++#include <Windows.h>
++#include <array>
++#include <chrono>
++#include <cmath>
++#include <cstring>
++#include <format>
++#include <string>
++#include <vector>
++
++namespace dingosdk::skate3_hom {
++namespace {
++using client_source::detail::first_person_read;
++void say(const std::string &text) { logging::log(logging::Level::info, logging::Channel::assets, "HoM rig: {}", text); }
++
++// A table of `count` parent indices (signed 16 or 32 bit): parent[0] is -1 or 0 and every
++// other entry names an earlier joint.
++bool looks_like_parents(const std::vector<std::int32_t> &p) {
++    if (p.empty() || (p[0] != -1 && p[0] != 0 && p[0] != 0xFFFF)) return false;
++    std::size_t earlier = 0;
++    for (std::size_t i = 1; i < p.size(); ++i)
++        if (p[i] >= 0 && static_cast<std::size_t>(p[i]) < i) ++earlier;
++    return earlier + 4 >= p.size() - 1;
++}
++
++// `hom phys`: the skater's physics bodies (the ragdoll the game draws), raw, next to the animation
++// skeleton's joints, to map one onto the other.
++void phys_probe(std::uintptr_t base, std::uintptr_t client) {
++    overlay::DebugModel skater;
++    (void)client_source::detail::debug_skater(base, client, skater);
++    const auto bodies = client_source::detail::debug_noclip_bodies(base, client, skater.skater_identity);
++    say(std::format("phys: offboard {}, root ({:.3f},{:.3f},{:.3f})", bodies.offboard, bodies.root[0], bodies.root[1], bodies.root[2]));
++    for (std::size_t i = 9; i < bodies.parts.size(); ++i) {
++        std::array<float, 76> f{};
++        if (!first_person_read(bodies.parts[i], f.data(), sizeof(f))) continue;
++        std::string line = std::format("body {:2} @{:#x}:", i - 8, bodies.parts[i]);
++        for (std::size_t k = 0; k < f.size(); ++k) {
++            if (!std::isfinite(f[k]) || std::abs(f[k]) > 1e7f || (std::abs(f[k]) < 1e-12f && f[k] != 0)) line += " *";
++            else line += std::format(" {:.3f}", f[k]);
++        }
++        say(line);
++    }
++    const auto rig = latest_rig(std::chrono::milliseconds(1000));
++    for (std::size_t i = 0; i < rig_bones && rig.valid; ++i)
++        say(std::format("xray {:2}: a ({:.3f},{:.3f},{:.3f}) b ({:.3f},{:.3f},{:.3f})", i, rig.bones[i].a[0], rig.bones[i].a[1], rig.bones[i].a[2],
++                        rig.bones[i].b[0], rig.bones[i].b[1], rig.bones[i].b[2]));
++}
++
++void probe(std::uintptr_t base, std::uintptr_t client) {
++    const auto component = client_source::detail::first_person_component(base, client);
++    std::uintptr_t holder{};
++    if (!first_person_read(component + 0xa0, &holder, 8) || !holder) return say("no animation holder");
++    const auto pose = multiplayer::read_native_pose_layout(first_person_read, base, holder, 512);
++    if (!pose.buffer) return say("no pose buffer");
++    say(std::format("{} joints, buffer {:#x}", pose.count, pose.buffer));
++
++    // The pose, parent-local: scale.xyz, rotation.xyzw, position.xyz per joint.
++    for (std::uint32_t first = 0; first < pose.count; first += 6) {
++        std::string line;
++        for (std::uint32_t i = first; i < std::min<std::uint32_t>(first + 6, pose.count); ++i) {
++            std::array<float, 12> b{};
++            if (!first_person_read(pose.buffer + i * 0x30ULL, b.data(), sizeof(b))) continue;
++            line += std::format("[{}] p({:.3f},{:.3f},{:.3f}) s{:.2f}  ", i, b[8], b[9], b[10], b[0]);
++        }
++        say(line);
++    }
++
++    // Look for the skeleton's parent table among the resource's pointers.
++    std::uintptr_t rig{}, definition{}, resource{};
++    if (!first_person_read(holder + 0x78, &rig, 8) || !rig || !first_person_read(rig + 0x18, &definition, 8) || !definition ||
++        !first_person_read(definition + 0x1a0, &resource, 8) || !resource)
++        return say("no skeleton resource");
++    say(std::format("resource {:#x}", resource));
++    std::array<std::uint64_t, 32> head{};
++    first_person_read(resource, head.data(), sizeof(head));
++    std::string words;
++    for (std::size_t i = 0; i < head.size(); ++i) words += std::format("{:#x} ", head[i]);
++    say("resource head: " + words);
++    for (std::size_t slot = 0; slot < head.size(); ++slot) {
++        const auto pointer = static_cast<std::uintptr_t>(head[slot]);
++        if (pointer < 0x10000 || pointer > 0x00007fffffffffffULL) continue;
++        for (const std::size_t width : {2u, 4u}) {
++            std::vector<unsigned char> raw(pose.count * width);
++            if (!first_person_read(pointer, raw.data(), raw.size())) continue;
++            std::vector<std::int32_t> values(pose.count);
++            for (std::uint32_t i = 0; i < pose.count; ++i) {
++                if (width == 2) {
++                    std::int16_t v{};
++                    std::memcpy(&v, raw.data() + i * 2, 2);
++                    values[i] = v;
++                } else {
++                    std::memcpy(&values[i], raw.data() + i * 4, 4);
++                }
++            }
++            if (!looks_like_parents(values)) continue;
++            say(std::format("parent table candidate: resource+{:#x} -> {:#x}, {}-bit", slot * 8, pointer, width * 8));
++            for (std::uint32_t first = 0; first < pose.count; first += 24) {
++                std::string line;
++                for (std::uint32_t i = first; i < std::min<std::uint32_t>(first + 24, pose.count); ++i) line += std::format("{} ", values[i]);
++                say(std::format("parents[{}..]: {}", first, line));
++            }
++        }
++    }
++    say("done");
++}
++
++// The pose is parent-local {scale, Hamilton quaternion, translation} per joint; joint 1 carries
++// the world placement, so composing from the root lands in world space (client_first_person.cpp).
++// The 395-joint AnimBase skeleton, mapped from a live dump (hom rig, 2026-10-08): the spine runs
++// 7 (pelvis) 42 43 44 45 (chest) 101 102 (neck) 103 (head) along local +X; legs hang off the
++// pelvis (8-11 and 341-344: hip, knee, ankle, ball) and arms off the chest (46-49 and 275-278:
++// clavicle, shoulder, elbow, wrist). Local -Z is the skater's right, so 8.. and 46.. are right.
++struct Joint {
++    std::array<float, 4> q{0, 0, 0, 1};
++    std::array<float, 3> p{};
++    float s = 1;
++};
++std::array<float, 3> rotate(const std::array<float, 4> &q, const std::array<float, 3> &v) {
++    const float tx = 2 * (q[1] * v[2] - q[2] * v[1]), ty = 2 * (q[2] * v[0] - q[0] * v[2]), tz = 2 * (q[0] * v[1] - q[1] * v[0]);
++    return {v[0] + q[3] * tx + (q[1] * tz - q[2] * ty), v[1] + q[3] * ty + (q[2] * tx - q[0] * tz), v[2] + q[3] * tz + (q[0] * ty - q[1] * tx)};
++}
++bool child(const Joint &parent, std::uintptr_t buffer, std::uint16_t index, Joint &out) {
++    std::array<float, 12> bone{};
++    if (!first_person_read(buffer + index * 0x30ULL, bone.data(), sizeof(bone))) return false;
++    for (const std::size_t i : {0u, 1u, 2u, 4u, 5u, 6u, 7u, 8u, 9u, 10u})
++        if (!std::isfinite(bone[i]) || std::abs(bone[i]) > 1000000.0f) return false;
++    const auto &q = parent.q;
++    const auto offset = rotate(q, {bone[8] * parent.s, bone[9] * parent.s, bone[10] * parent.s});
++    for (std::size_t i = 0; i < 3; ++i) out.p[i] = parent.p[i] + offset[i];
++    out.q = {q[3] * bone[4] + q[0] * bone[7] + q[1] * bone[6] - q[2] * bone[5], q[3] * bone[5] - q[0] * bone[6] + q[1] * bone[7] + q[2] * bone[4],
++             q[3] * bone[6] + q[0] * bone[5] - q[1] * bone[4] + q[2] * bone[7], q[3] * bone[7] - q[0] * bone[4] - q[1] * bone[5] - q[2] * bone[6]};
++    out.s = parent.s * (bone[0] + bone[1] + bone[2]) / 3.0f;
++    return std::isfinite(out.s) && out.s > 0.01f;
++}
++constexpr std::array<std::pair<std::uint16_t, std::uint16_t>, 26> chains{{
++    {1, 0}, {7, 1}, {42, 7}, {43, 42}, {44, 43}, {45, 44}, {101, 45}, {102, 101}, {103, 102},
++    {8, 7}, {9, 8}, {10, 9}, {11, 10}, {341, 7}, {342, 341}, {343, 342}, {344, 343},
++    {46, 45}, {47, 46}, {48, 47}, {49, 48}, {275, 45}, {276, 275}, {277, 276}, {278, 277}, {0, 0}}};
++std::array<float, 3> along(const std::array<float, 3> &from, const std::array<float, 3> &to, float metres) {
++    std::array<float, 3> d{to[0] - from[0], to[1] - from[1], to[2] - from[2]};
++    const float l = std::sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]);
++    if (l < 1e-5f) return to;
++    return {to[0] + d[0] / l * metres, to[1] + d[1] / l * metres, to[2] + d[2] / l * metres};
++}
++std::array<float, 3> lerp(const std::array<float, 3> &a, const std::array<float, 3> &b, float t) {
++    return {a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t};
++}
++
++// ---- Roll from the joints --------------------------------------------------------------------
++// A bone mesh needs to know which way it faces around its own length. Joint-to-joint positions give
++// the length direction only, so the roll used to come from the body's forward; that goes wrong once
++// the body tumbles. Each bone instead follows its start joint's rotation R. While the skater is
++// upright, K = R^T F is measured against the frame F built from the body forward (right then), and
++// afterwards F = R K carries that same roll through any pose.
++using Vec3 = std::array<float, 3>;
++using Mat3 = std::array<Vec3, 3>; // three columns
++Vec3 cross3(const Vec3 &a, const Vec3 &b) { return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]}; }
++float dot3(const Vec3 &a, const Vec3 &b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
++Vec3 norm3(const Vec3 &a) {
++    const float l = std::sqrt(dot3(a, a));
++    return l > 1e-6f ? Vec3{a[0] / l, a[1] / l, a[2] / l} : Vec3{0, 0, 0};
++}
++Mat3 rotation_columns(const std::array<float, 4> &q) {
++    return {rotate(q, {1, 0, 0}), rotate(q, {0, 1, 0}), rotate(q, {0, 0, 1})};
++}
++// K = R^T F: entry (row i, column k) = dot(R column i, F column k).
++Mat3 relative(const Mat3 &r, const Mat3 &f) {
++    Mat3 k{};
++    for (int col = 0; col < 3; ++col)
++        for (int row = 0; row < 3; ++row) k[col][row] = dot3(r[row], f[col]);
++    return k;
++}
++Vec3 mat_vec(const Mat3 &r, const Vec3 &v) { // R v
++    return {r[0][0] * v[0] + r[1][0] * v[1] + r[2][0] * v[2], r[0][1] * v[0] + r[1][1] * v[1] + r[2][1] * v[2],
++            r[0][2] * v[0] + r[1][2] * v[1] + r[2][2] * v[2]};
++}
++void orthonormalise(Mat3 &m) {
++    m[0] = norm3(m[0]);
++    Vec3 y = m[1];
++    const float d = dot3(y, m[0]);
++    y = {y[0] - m[0][0] * d, y[1] - m[0][1] * d, y[2] - m[0][2] * d};
++    m[1] = norm3(y);
++    m[2] = cross3(m[0], m[1]);
++}
++constexpr std::array<std::uint16_t, rig_bones> reference_joint{103, 101, 44, 42, 7, 276, 47, 277, 48, 278, 49, 341, 8, 342, 9, 343, 10, 344, 11};
++struct RollCalibration {
++    std::array<Mat3, rig_bones> k{};
++    std::array<bool, rig_bones> set{};
++};
++RollCalibration &roll_calibration() {
++    static RollCalibration value;
++    return value;
++}
++
++// The ragdoll's own physics bodies. Each sits on one joint of the animation skeleton (mapped from
++// a standing skater, 2026-10-08: within 1 cm), and they are what the game draws: during a fall the
++// animation pose trails them by about a frame (up to 0.2 m at speed), at rest they agree. So a
++// joint is placed from its body when the bodies can be read.
++constexpr std::array<std::uint16_t, 24> body_joint{0,   103, 101, 278, 277, 276, 275, 49, 48, 47, 46, 45,
++                                                   44,  43,  42,  344, 343, 342, 341, 11, 10, 9,  8,  7};
++bool read_body_positions(std::uintptr_t base, std::uintptr_t client, std::array<std::array<float, 3>, 24> &out) {
++    overlay::DebugModel skater;
++    (void)client_source::detail::debug_skater(base, client, skater);
++    const auto bodies = client_source::detail::debug_noclip_bodies(base, client, skater.skater_identity);
++    for (std::size_t k = 1; k < 24; ++k) {
++        std::array<float, 3> position{};
++        if (!first_person_read(bodies.parts[k + 8] + 20 * sizeof(float), position.data(), sizeof(position))) return false;
++        for (const float v : position)
++            if (!std::isfinite(v) || std::abs(v) > 1000000.0f) return false;
++        out[k] = position;
++    }
++    return true;
++}
++
++void publish_pose(std::uintptr_t base, std::uintptr_t holder, std::uintptr_t client) {
++    const auto pose = multiplayer::read_native_pose_layout(first_person_read, base, holder, 512);
++    if (!pose.buffer || pose.count != 395) return;
++    std::array<Joint, 395> j{};
++    std::array<bool, 395> have{};
++    have[0] = true;
++    if (!child(Joint{}, pose.buffer, 0, j[0])) return;
++    for (std::size_t i = 0; i + 1 < chains.size(); ++i) {
++        const auto [index, parent] = chains[i];
++        if (!have[parent] || !child(j[parent], pose.buffer, index, j[index])) return;
++        have[index] = true;
++    }
++    // Where the physics bodies are, they win; the head-top and limb tips follow from them.
++    std::array<std::array<float, 3>, 395> placed{};
++    for (std::size_t i = 0; i < 395; ++i) placed[i] = j[i].p;
++    {
++        std::array<std::array<float, 3>, 24> bodies{};
++        bool ok = false;
++        try {
++            ok = client && read_body_positions(base, client, bodies);
++        } catch (...) {
++            ok = false;
++        }
++        if (ok) {
++            // Sanity: every body must be near its joint (a different rig, a respawn): else keep the pose.
++            for (std::size_t k = 1; k < 24 && ok; ++k) {
++                const auto &a = bodies[k], &b = j[body_joint[k]].p;
++                const float gap = std::sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]));
++                if (gap > 1.5f) ok = false;
++            }
++        }
++        if (ok)
++            for (std::size_t k = 1; k < 24; ++k) placed[body_joint[k]] = bodies[k];
++        rig_from_bodies().store(ok);
++    }
++    const auto P = [&](std::uint16_t i) { return placed[i]; };
++    RigView view;
++    const auto head_top = [&] {
++        const auto up = rotate(j[103].q, {0.17f * j[103].s, 0, 0});
++        return std::array<float, 3>{P(103)[0] + up[0], P(103)[1] + up[1], P(103)[2] + up[2]};
++    }();
++    // Order: Skull, Neck, Rib Cage, Lower Spine, Hips, Bicep L/R, Forearm L/R, Hand L/R, Thigh L/R,
++    // Calf L/R, Ankle L/R, Toes L/R (left first, as in bones()).
++    view.bones = {{
++        {P(103), head_top, 0.085f},
++        {P(101), P(103), 0.035f},
++        {P(44), P(101), 0.12f},
++        {P(7), P(44), 0.05f},
++        {P(341), P(8), 0.06f},
++        {P(276), P(277), 0.035f}, {P(47), P(48), 0.035f},
++        {P(277), P(278), 0.03f}, {P(48), P(49), 0.03f},
++        {P(278), along(P(277), P(278), 0.09f), 0.03f}, {P(49), along(P(48), P(49), 0.09f), 0.03f},
++        {P(341), P(342), 0.05f}, {P(8), P(9), 0.05f},
++        {P(342), P(343), 0.04f}, {P(9), P(10), 0.04f},
++        {P(343), lerp(P(343), P(344), 0.5f), 0.035f}, {P(10), lerp(P(10), P(11), 0.5f), 0.035f},
++        {P(344), along(P(343), P(344), 0.07f), 0.025f}, {P(11), along(P(10), P(11), 0.07f), 0.025f},
++    }};
++    view.valid = true;
++    {
++        // Body forward from the skeleton's own shape: up the spine crossed with the hips' left-to-right,
++        // turned to agree with the face (head local +Y looks out of the face).
++        const auto sub3 = [](const std::array<float, 3> &a, const std::array<float, 3> &b) { return std::array<float, 3>{a[0] - b[0], a[1] - b[1], a[2] - b[2]}; };
++        const auto up = sub3(P(45), P(7));
++        const auto right = sub3(P(8), P(341));
++        std::array<float, 3> f{up[1] * right[2] - up[2] * right[1], up[2] * right[0] - up[0] * right[2], up[0] * right[1] - up[1] * right[0]};
++        const auto face = rotate(j[103].q, {0, 1, 0});
++        if (f[0] * face[0] + f[1] * face[1] + f[2] * face[2] < 0) f = {-f[0], -f[1], -f[2]};
++        const float l = std::sqrt(f[0] * f[0] + f[1] * f[1] + f[2] * f[2]);
++        view.forward = l > 1e-4f ? std::array<float, 3>{f[0] / l, f[1] / l, f[2] / l} : face;
++    }
++    // Upright: the head at least half a metre above the hips (standing or walking off).
++    const bool upright = P(103)[1] - P(7)[1] > 0.5f;
++    rig_upright().store(upright);
++    rig_lying().store(P(103)[1] - P(7)[1] < 0.3f);
++    {
++        auto &cal = roll_calibration();
++        for (std::size_t i = 0; i < rig_bones; ++i) {
++            auto &seg = view.bones[i];
++            const Vec3 axis = norm3({seg.b[0] - seg.a[0], seg.b[1] - seg.a[1], seg.b[2] - seg.a[2]});
++            const auto &joint = j[reference_joint[i]];
++            const float qn = std::sqrt(joint.q[0] * joint.q[0] + joint.q[1] * joint.q[1] + joint.q[2] * joint.q[2] + joint.q[3] * joint.q[3]);
++            if (dot3(axis, axis) < 0.5f || qn < 0.5f) continue;
++            const std::array<float, 4> q{joint.q[0] / qn, joint.q[1] / qn, joint.q[2] / qn, joint.q[3] / qn};
++            const Mat3 r = rotation_columns(q);
++            if (upright) {
++                // The frame this bone has right now, from the body forward.
++                const float along = dot3(view.forward, axis);
++                Vec3 front = {view.forward[0] - axis[0] * along, view.forward[1] - axis[1] * along, view.forward[2] - axis[2] * along};
++                front = norm3(front);
++                if (dot3(front, front) > 0.5f) {
++                    const Mat3 f{axis, front, cross3(axis, front)};
++                    Mat3 k = relative(r, f);
++                    if (cal.set[i]) {
++                        for (int c = 0; c < 3; ++c)
++                            for (int e = 0; e < 3; ++e) k[c][e] = cal.k[i][c][e] * 0.92f + k[c][e] * 0.08f;
++                    }
++                    orthonormalise(k);
++                    cal.k[i] = k;
++                    cal.set[i] = true;
++                }
++            }
++            if (cal.set[i]) {
++                // Column 1 of R K is the bone's front; keep only its part across the bone.
++                const Vec3 front = mat_vec(r, cal.k[i][1]);
++                const float along = dot3(front, axis);
++                const Vec3 across = norm3({front[0] - axis[0] * along, front[1] - axis[1] * along, front[2] - axis[2] * along});
++                if (dot3(across, across) > 0.5f) {
++                    seg.front = across;
++                    seg.has_front = true;
++                }
++            }
++        }
++    }
++    view.base = base;
++    view.at = std::chrono::steady_clock::now();
++    publish_rig(view);
++}
++
++// The game's UI draw flag (what ReSkate's own `hideui` toggles): cleared while a bail is on
++// screen, put back afterwards unless someone else changed it meanwhile.
++struct UiHide {
++    bool applied{};
++    std::uintptr_t object{};
++};
++bool write_byte(std::uintptr_t address, std::uint8_t value) noexcept {
++    __try {
++        *reinterpret_cast<volatile std::uint8_t *>(address) = value;
++        return true;
++    } __except (EXCEPTION_EXECUTE_HANDLER) {
++        return false;
++    }
++}
++void apply_ui_hide(std::uintptr_t base) noexcept {
++    static UiHide hide;
++    const bool want = hide_game_ui().load();
++    namespace spawn = addr::client_source_spawn;
++    std::uintptr_t object{}, vtable{}, type{};
++    if (!first_person_read(base + spawn::ui_settings, &object, 8) || !object || !first_person_read(object, &vtable, 8) ||
++        vtable != base + spawn::ui_settings_vtable || !first_person_read(object + 8, &type, 8) || type != base + spawn::ui_settings_type)
++        return;
++    std::uint8_t draw{};
++    if (!first_person_read(object + 0x4e, &draw, 1) || draw > 1) return;
++    if (want && !hide.applied && draw == 1) {
++        if (write_byte(object + 0x4e, 0)) hide = {true, object};
++    } else if (!want && hide.applied) {
++        if (hide.object == object && draw == 0) (void)write_byte(object + 0x4e, 1);
++        hide = {};
++    }
++}
++} // namespace
++
++namespace {
++// Skate 3's car bonus needs to know when the skater hits a car: skate.'s contact records say which
++// body touched a vehicle in the last physics step (the layout ReSkate's own Hall of Meat reads,
++// Engine/Game/Build/20260929/skater_body.h), checked against its code before it is trusted.
++bool contacts_readable(std::uintptr_t base) noexcept {
++    static int verdict = -1;
++    if (verdict < 0) {
++        verdict = 1;
++        for (const auto &contract : addr::skater_body::contracts) {
++            std::array<unsigned char, 32> actual{};
++            if (!first_person_read(base + contract.rva, actual.data(), actual.size()) || actual != contract.bytes) {
++                verdict = 0;
++                logging::log(logging::Level::info, logging::Channel::assets, "Hall Of Meat: skater contacts not readable here, no car bonus.");
++                break;
++            }
++        }
++    }
++    return verdict == 1;
++}
++void read_vehicle_contact(std::uintptr_t base) noexcept {
++    namespace body = addr::skater_body;
++    bool touched = false;
++    NoBailSkater skater;
++    std::uintptr_t holder{}, contacts{};
++    std::array<unsigned char, body::body_bone_count * body::bone_record_size> records{};
++    std::array<std::uint8_t, body::body_bone_count> touching{};
++    if (contacts_readable(base) && no_bail_skater(skater) && skater.rig &&
++        first_person_read(skater.rig + body::contact_holder_offset, &holder, sizeof(holder)) && holder &&
++        first_person_read(holder + body::contact_struct_offset, &contacts, sizeof(contacts)) && contacts &&
++        first_person_read(contacts + body::bone_records_offset, records.data(), records.size()) &&
++        first_person_read(contacts + body::bone_touching_offset, touching.data(), touching.size()))
++        for (std::size_t i = 0; i < body::body_bone_count; ++i)
++            if (touching[i] && records[i * body::bone_record_size + body::bone_hit_vehicle_offset]) touched = true;
++    vehicle_contact().store(touched);
++    // The offboard state's ragdoll flag (Engine/Game/Build/20260929/skater_state.h), read the same way.
++    namespace state = addr::skater_state;
++    int ragdoll = -1;
++    std::uintptr_t trick_state{}, offboard{};
++    std::uint8_t flag{};
++    if (contacts_readable(base) && skater.core && first_person_read(skater.core + state::trick_state_offset, &trick_state, sizeof(trick_state)) &&
++        trick_state && first_person_read(trick_state + state::offboard_state_offset, &offboard, sizeof(offboard)) && offboard &&
++        first_person_read(offboard + state::ragdoll_offset, &flag, sizeof(flag)) && flag <= 1)
++        ragdoll = flag;
++    rig_ragdoll().store(ragdoll);
++}
++} // namespace
++
++void rig_tick(std::uintptr_t base, std::uintptr_t client) noexcept {
++    read_vehicle_contact(base);
++    try {
++        const auto component = client_source::detail::first_person_component(base, client);
++        std::uintptr_t holder{};
++        if (first_person_read(component + 0xa0, &holder, 8) && holder) {
++            publish_pose(base, holder, client);
++        }
++    } catch (...) {
++    }
++    apply_ui_hide(base);
++    if (phys_probe_requested().exchange(false)) {
++        try {
++            phys_probe(base, client);
++            probe(base, client);
++        } catch (const std::exception &error) {
++            say(std::string("phys failed: ") + error.what());
++        } catch (...) {
++        }
++    }
++    if (!rig_probe_requested().exchange(false)) return;
++    try {
++        probe(base, client);
++    } catch (const std::exception &error) {
++        say(std::string("failed: ") + error.what());
++    } catch (...) {
++        say("failed");
++    }
++}
++} // namespace dingosdk::skate3_hom
+diff --git a/Extension/Skate3HallOfMeat/hom_rig.h b/Extension/Skate3HallOfMeat/hom_rig.h
+new file mode 100644
+index 0000000..a78be45
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/hom_rig.h
+@@ -0,0 +1,107 @@
++#pragma once
++#include <array>
++#include <atomic>
++#include <chrono>
++#include <cstdint>
++#include <mutex>
++
++// Hall Of Meat's view of the local skater's skeleton, for the X-ray. The game thread reads the
++// animation pose every client tick (hom_rig.cpp) and publishes one world-space segment per bone of
++// the original's X-ray skeleton (the 19 `dem_bones_hom` meshes); the HUD projects them.
++namespace dingosdk::skate3_hom {
++// Same order as bones() in hom_core.cpp.
++inline constexpr std::size_t rig_bones = 19;
++struct RigSegment {
++    std::array<float, 3> a{}, b{};
++    std::array<float, 3> va{}, vb{}; // m/s, from the last two reads
++    float radius{}; // metres
++    // Which way the bone's front faces, from the joint's own rotation (so hands, feet and ribs keep
++    // their roll while the body tumbles). Only when has_front; otherwise the body forward is used.
++    std::array<float, 3> front{};
++    bool has_front{};
++};
++struct RigView {
++    bool valid{};
++    std::array<RigSegment, rig_bones> bones{};
++    std::array<float, 3> forward{0, 0, 1}; // the skater's body forward (pelvis local +Y)
++    std::uintptr_t base{};
++    std::chrono::steady_clock::time_point at{};
++    float period{0.016f}; // seconds between the last two reads
++};
++namespace rig_detail {
++inline std::mutex mutex;
++inline RigView latest;
++} // namespace rig_detail
++inline void publish_rig(const RigView &view) noexcept {
++    std::lock_guard lock(rig_detail::mutex);
++    RigView next = view;
++    const auto &previous = rig_detail::latest;
++    const double dt = std::chrono::duration<double>(view.at - previous.at).count();
++    if (previous.valid && dt > 0.003 && dt < 0.12) next.period = static_cast<float>(dt);
++    if (previous.valid && dt > 0.003 && dt < 0.12)
++        for (std::size_t i = 0; i < rig_bones; ++i)
++            for (std::size_t k = 0; k < 3; ++k) {
++                next.bones[i].va[k] = static_cast<float>((view.bones[i].a[k] - previous.bones[i].a[k]) / dt);
++                next.bones[i].vb[k] = static_cast<float>((view.bones[i].b[k] - previous.bones[i].b[k]) / dt);
++            }
++    rig_detail::latest = next;
++}
++// Nothing when the skeleton was not read recently.
++inline RigView latest_rig(std::chrono::milliseconds max_age = std::chrono::milliseconds(250)) noexcept {
++    std::lock_guard lock(rig_detail::mutex);
++    if (!rig_detail::latest.valid || std::chrono::steady_clock::now() - rig_detail::latest.at > max_age) return {};
++    return rig_detail::latest;
++}
++// Set by the HUD while a bail is on screen: the game's own interface is hidden meanwhile.
++inline std::atomic<bool> &hide_game_ui() {
++    static std::atomic<bool> value{};
++    return value;
++}
++// Whether the skater stands upright (head well above the hips), from the last skeleton read.
++// A body of the local skater touched a vehicle in the last physics step (skate.'s contact records).
++// skate.'s own word on the body off the board: 1 a ragdoll (a crash), 0 under control (on foot, a
++// glide, a dive), -1 not readable.
++inline std::atomic<int> &rig_ragdoll() {
++    static std::atomic<int> value{-1};
++    return value;
++}
++inline std::atomic<bool> &vehicle_contact() {
++    static std::atomic<bool> value{};
++    return value;
++}
++inline std::atomic<bool> &rig_upright() {
++    static std::atomic<bool> value{};
++    return value;
++}
++// `hom roll 0|1`: take each bone's roll from its joint (on) or from the body forward (off).
++// Whether the body is lying down (head no more than ~0.3 m above the hips).
++inline std::atomic<bool> &rig_lying() {
++    static std::atomic<bool> value{};
++    return value;
++}
++// Whether the last skeleton came from the ragdoll's physics bodies (else the animation pose).
++inline std::atomic<bool> &rig_from_bodies() {
++    static std::atomic<bool> value{};
++    return value;
++}
++// Extra milliseconds the X-ray is carried ahead of the last skeleton read (`hom lead`), saved with
++// the profile: a machine whose picture shows the body later than the read can catch the bones up.
++inline std::atomic<float> &bone_lead_ms() {
++    static std::atomic<float> value{0.0f};
++    return value;
++}
++inline std::atomic<bool> &roll_from_joints() {
++    static std::atomic<bool> value{true};
++    return value;
++}
++inline std::atomic<bool> &phys_probe_requested() {
++    static std::atomic<bool> value{};
++    return value;
++}
++inline std::atomic<bool> &rig_probe_requested() {
++    static std::atomic<bool> value{};
++    return value;
++}
++// Game thread, once per client tick, before the bail tracker.
++void rig_tick(std::uintptr_t base, std::uintptr_t client) noexcept;
++} // namespace dingosdk::skate3_hom
+diff --git a/Extension/Skate3HallOfMeat/s3hom_hud.cpp b/Extension/Skate3HallOfMeat/s3hom_hud.cpp
+new file mode 100644
+index 0000000..c806701
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/s3hom_hud.cpp
+@@ -0,0 +1,804 @@
++#include "s3hom_hud.h"
++#include "hom_art.h"
++#include "hom_audio.h"
++#include "hom_grade.h"
++#include "hom_bones.h"
++#include "hom_core.h"
++#include "hom_rig.h"
++#include "Engine/Core/Platform/memory.h"
++#include "Engine/Game/Build/addresses.h"
++#include "Engine/Game/Build/20260929/engine.h"
++#include "Engine/Game/Build/20260929/client_source_spawn.h"
++#include "Engine/Game/UI/game_view.h"
++#include "Engine/Core/Log/logging.h"
++#include "Extension/Trainer/trainer.h"
++#include "Extension/Profile/local_profile_runtime.h"
++#include <atomic>
++#include <algorithm>
++#include <utility>
++#include <chrono>
++#include <cmath>
++#include <format>
++#include <imgui.h>
++#include <mutex>
++#include <string>
++#include <string_view>
++#include <vector>
++
++// Hall Of Meat, as Skate 3 draws it when the skater crashes: the picture closes in to a dark,
++// grainy spotlight, the hurt and broken bones show through the body, and bottom left a bone chip
++// and a stack of metric rows sit over the Thrasher "Hall of Meat" mark and the score.
++namespace dingosdk::overlay {
++namespace {
++using namespace dingosdk::skate3_hom;
++using Clock = std::chrono::steady_clock;
++
++constexpr double linger_seconds = 4.0, fade_seconds = 0.8;
++constexpr ImU32 cyan = IM_COL32(150, 232, 240, 255);
++constexpr ImU32 white = IM_COL32(246, 246, 246, 255);
++constexpr ImU32 chip_blue = IM_COL32(32, 168, 214, 235);
++
++struct State {
++    std::mutex mutex; // the game thread feeds the tracker, the presentation thread draws it
++    Tracker tracker;
++    double visible_until{};
++    double started{};
++    float shown_total{};
++    // Each map's best bail, saved with the profile.
++    std::string level;
++    bool best_known{};
++    int best{};
++    bool new_best{}; // the bail on screen beat the map's best
++    // The last break, on the real clock (the slow motion it starts is timed on that).
++    double break_real{-1};
++    std::size_t breaks_seen{};
++    std::uint32_t breaks_serial{};
++    bool whoosh_pending{}; // the slow motion's sound, once the game really slows
++    std::uint32_t last_state{};
++    double last_time{-1};
++    double heartbeat{};
++    float darkness{};
++    double watch_logged{};
++    int cancelled_seen{};
++    std::uint32_t xray_serial{};
++    double upright_since{-1}, getting_up_at{-1}; // the live bail's skater getting up (X-ray fading out)
++    std::uint32_t sounded_serial{};
++    std::size_t sounded{}; // damage events of the live bail already heard
++};
++State &state() {
++    static State value;
++    return value;
++}
++
++double real_seconds() { return std::chrono::duration<double>(Clock::now().time_since_epoch()).count(); }
++std::atomic<float> &applied_speed() {
++    static std::atomic<float> value{1.0f};
++    return value;
++}
++// The game's clock: real time run at the speed the game runs at, so a bail in slow motion is timed,
++// and its bones' speeds read, as the game plays it.
++double clock_seconds() {
++    static std::mutex mutex;
++    static double real_from = -1, game_from = 0;
++    static float speed = 1.0f;
++    const double real = real_seconds();
++    std::lock_guard lock(mutex);
++    if (real_from < 0) real_from = game_from = real;
++    const double game = game_from + (real - real_from) * speed;
++    if (const float now = applied_speed().load(); now != speed) {
++        game_from = game;
++        real_from = real;
++        speed = now;
++    }
++    return game;
++}
++// Skate 3's slow motion on a break: down to 0.3 in 0.15 s, held 1 s, back over 1 s.
++float slow_motion_curve(double since) {
++    constexpr double rise = 0.15, hold = 1.0, fall = 1.0;
++    constexpr float slowest = 0.3f;
++    if (since < 0 || since >= rise + hold + fall) return 1.0f;
++    const double k = since < rise ? since / rise : since < rise + hold ? 1.0 : 1.0 - (since - rise - hold) / fall;
++    return 1.0f - (1.0f - slowest) * static_cast<float>(k);
++}
++std::string best_key(std::string_view level) {
++    std::string key("Skate3HallOfMeat.Best.");
++    for (const char c : level) key += static_cast<char>(c >= 'A' && c <= 'Z' ? c - 'A' + 'a' : c);
++    return key;
++}
++
++std::string with_commas(int value) {
++    auto text = std::to_string(value);
++    for (int i = static_cast<int>(text.size()) - 3; i > 0; i -= 3) text.insert(static_cast<std::size_t>(i), ",");
++    return text;
++}
++ImU32 alpha(ImU32 colour, float a) {
++    const auto base = static_cast<float>((colour >> IM_COL32_A_SHIFT) & 0xff);
++    return (colour & ~IM_COL32_A_MASK) | (static_cast<ImU32>(std::clamp(base * a, 0.0f, 255.0f)) << IM_COL32_A_SHIFT);
++}
++void shadowed(ImDrawList *draw, ImFont *font, float size, ImVec2 at, ImU32 colour, const std::string &text) {
++    const float offset = std::max(1.0f, size / 14.0f);
++    const auto a = static_cast<float>((colour >> IM_COL32_A_SHIFT) & 0xff) / 255.0f;
++    draw->AddText(font, size, ImVec2(at.x + offset, at.y + offset), alpha(IM_COL32(0, 0, 0, 255), a * 0.85f), text.c_str());
++    draw->AddText(font, size, at, colour, text.c_str());
++}
++void image(ImDrawList *draw, std::string_view name, ImVec2 a, ImVec2 b, ImU32 tint = IM_COL32_WHITE) {
++    HomArt art;
++    if (hom_art(name, art)) draw->AddImage(art.texture, a, b, art.uv0, art.uv1, tint);
++}
++bool has_art(std::string_view name) {
++    HomArt art;
++    return hom_art(name, art);
++}
++
++// Small icons for rows the original art does not give us a texture for.
++void icon_rotation(ImDrawList *draw, ImVec2 c, float r, ImU32 colour) {
++    draw->PathArcTo(c, r * 0.75f, -0.3f, 4.6f, 24);
++    draw->PathStroke(colour, 0, r * 0.28f);
++    draw->AddTriangleFilled(ImVec2(c.x + r * 0.95f, c.y - r * 0.5f), ImVec2(c.x + r * 0.35f, c.y - r * 0.55f),
++                            ImVec2(c.x + r * 0.7f, c.y + r * 0.05f), colour);
++}
++void icon_air(ImDrawList *draw, ImVec2 c, float r, ImU32 colour) {
++    draw->AddTriangleFilled(ImVec2(c.x, c.y - r), ImVec2(c.x - r * 0.9f, c.y + r * 0.6f), ImVec2(c.x + r * 0.9f, c.y + r * 0.6f), colour);
++    draw->AddTriangleFilled(ImVec2(c.x, c.y + r * 0.25f), ImVec2(c.x - r * 0.35f, c.y + r), ImVec2(c.x + r * 0.35f, c.y + r), alpha(colour, 0.7f));
++}
++
++struct Row {
++    std::string_view icon;
++    int kind;  // 0 rotation, 1 air, 2 drop, 3 duration, 4 speed
++    std::string value, points;
++};
++
++void draw_block(ImDrawList *draw, const Result &r, float total_shown, float fade, float scale, double now, double started, int best, bool new_best) {
++    const auto display = ImGui::GetIO().DisplaySize;
++    auto *font = hom_font(28) ? hom_font(28) : ImGui::GetFont();
++    auto *score_font = hom_font(60) ? hom_font(60) : font;
++    auto *small_font = hom_font(22) ? hom_font(22) : font;
++    const float left = display.x * 0.083f, right = display.x * 0.23f, bottom = display.y * 0.925f;
++    const float width = right - left;
++    const float intro = std::clamp(static_cast<float>((now - started) / 0.25), 0.0f, 1.0f);
++    const float a = fade * intro;
++    const float slide = (1.0f - intro) * -24.0f * scale;
++    const float cx = left + width * 0.5f + slide;
++
++    // Score and mark.
++    const float score_size = 60.0f * scale;
++    const auto score = with_commas(static_cast<int>(total_shown));
++    const auto extent = score_font->CalcTextSizeA(score_size, FLT_MAX, 0.0f, score.c_str());
++    const float score_y = bottom - score_size - 2.0f * scale;
++    shadowed(draw, score_font, score_size, ImVec2(cx - extent.x * 0.5f, score_y), alpha(white, a), score);
++    draw->AddRectFilled(ImVec2(left + slide, bottom), ImVec2(right + slide, bottom + 2.0f * scale), alpha(IM_COL32(170, 220, 235, 190), a));
++    // The map's best under the rule: NEW BEST in Skate 3's break orange, else the score to beat.
++    if (new_best || best > 0) {
++        const float size = 20.0f * scale;
++        const auto text = new_best ? std::string("NEW BEST") : "BEST " + with_commas(best);
++        const auto e = small_font->CalcTextSizeA(size, FLT_MAX, 0.0f, text.c_str());
++        const float pulse = new_best ? 0.8f + 0.2f * std::sin(static_cast<float>(ImGui::GetTime()) * 6.0f) : 1.0f;
++        shadowed(draw, small_font, size, ImVec2(cx - e.x * 0.5f, bottom + 6.0f * scale),
++                 alpha(new_best ? IM_COL32(255, 140, 50, 255) : IM_COL32(200, 214, 222, 255), a * pulse), text);
++    }
++
++    const float hom_size = 22.0f * scale;
++    const auto hom = std::string("Hall of Meat");
++    const auto hom_extent = small_font->CalcTextSizeA(hom_size, FLT_MAX, 0.0f, hom.c_str());
++    const float hom_y = score_y - hom_size - 2.0f * scale;
++    shadowed(draw, small_font, hom_size, ImVec2(cx - hom_extent.x * 0.5f, hom_y), alpha(IM_COL32(236, 236, 236, 255), a), hom);
++
++    const float logo_h = 62.0f * scale;
++    const float logo_y = hom_y - logo_h + 2.0f * scale;
++    if (has_art("thrasher")) {
++        HomArt logo;
++        hom_art("thrasher", logo);
++        const float logo_w = logo_h * logo.width / std::max(1.0f, logo.height);
++        image(draw, "thrasher", ImVec2(cx - logo_w * 0.5f, logo_y), ImVec2(cx + logo_w * 0.5f, logo_y + logo_h), alpha(cyan, a));
++    } else {
++        const auto name = std::string("THRASHER");
++        const float s = logo_h * 0.95f;
++        const auto e = font->CalcTextSizeA(s, FLT_MAX, 0.0f, name.c_str());
++        shadowed(draw, font, s, ImVec2(cx - e.x * 0.5f, logo_y), alpha(cyan, a), name);
++    }
++
++    // Metric rows stacked as the original does: the first to appear sits nearest the score, each
++    // new one goes on top.
++    std::vector<std::pair<double, Row>> shown;
++    const auto add = [&](int metric, Row row) {
++        if (metric_visible(r, metric)) shown.push_back({r.shown_at[metric] < 0 ? 1e30 : r.shown_at[metric], std::move(row)});
++    };
++    add(0, {"", 0, std::format("{:.0f}\xC2\xB0", r.rotation), r.rotation_points > 0 ? with_commas(r.rotation_points) : ""});
++    add(1, {"", 1, std::format("{:05.2f}s", r.air_time), with_commas(r.air_points)});
++    add(2, {"arrow", 2, std::format("{:.1f} m", r.drop), with_commas(r.drop_points)});
++    add(3, {"timer", 3, std::format("{:05.2f}s", r.duration), with_commas(r.duration_points)});
++    add(4, {"", 4, std::format("{:.1f} Km/h", r.peak_speed * 3.6f), with_commas(r.speed_points)});
++    std::stable_sort(shown.begin(), shown.end(), [](const auto &l, const auto &rr) { return l.first > rr.first; });
++    std::vector<Row> rows;
++    for (auto &[at, row] : shown) rows.push_back(std::move(row));
++
++    const float row_h = 36.0f * scale, text_size = 28.0f * scale;
++    float y = logo_y - 12.0f * scale - row_h;
++    for (auto it = rows.rbegin(); it != rows.rend(); ++it) {
++        const ImVec2 icon_centre(left + 22.0f * scale + slide, y + row_h * 0.5f);
++        const float ir = 12.0f * scale;
++        const ImU32 icon_colour = alpha(cyan, a);
++        if (it->kind == 0) icon_rotation(draw, icon_centre, ir, icon_colour);
++        else if (it->kind == 1) icon_air(draw, icon_centre, ir, icon_colour);
++        else if (it->kind == 4) {
++            // Speed: three rising bars.
++            for (int b = 0; b < 3; ++b) {
++                const float bx = icon_centre.x - ir + b * ir * 0.75f, bh = ir * (0.6f + 0.5f * b);
++                draw->AddRectFilled(ImVec2(bx, icon_centre.y + ir - bh), ImVec2(bx + ir * 0.5f, icon_centre.y + ir), icon_colour);
++            }
++        }
++        else if (has_art(it->icon)) image(draw, it->icon, ImVec2(icon_centre.x - ir, icon_centre.y - ir), ImVec2(icon_centre.x + ir, icon_centre.y + ir), icon_colour);
++        const float text_y = y + (row_h - text_size) * 0.5f;
++        shadowed(draw, font, text_size, ImVec2(left + 50.0f * scale + slide, text_y), alpha(white, a), it->value);
++        if (!it->points.empty()) {
++            const auto e = font->CalcTextSizeA(text_size, FLT_MAX, 0.0f, it->points.c_str());
++            shadowed(draw, font, text_size, ImVec2(right - e.x + slide, text_y), alpha(white, a), it->points);
++        }
++        y -= row_h;
++    }
++
++    // Skate 3's bonus chips on top: cars, then the bones.
++    if (r.car_points > 0) {
++        const float chip_h = row_h * 0.9f;
++        const ImVec2 a0(left + slide, y + (row_h - chip_h) * 0.5f);
++        draw->AddRectFilled(a0, ImVec2(left + 112.0f * scale + slide, a0.y + chip_h), alpha(chip_blue, a), 3.0f * scale);
++        {
++            // A car side on: body, cabin, wheels.
++            const float u = chip_h / 32.0f, x0 = a0.x + 4.0f * u, yb = a0.y + 22.0f * u;
++            const ImU32 c = alpha(IM_COL32_WHITE, a);
++            draw->AddRectFilled(ImVec2(x0, yb - 8.0f * u), ImVec2(x0 + 26.0f * u, yb), c, 2.0f * u);
++            draw->AddRectFilled(ImVec2(x0 + 6.0f * u, yb - 14.0f * u), ImVec2(x0 + 19.0f * u, yb - 7.0f * u), c, 2.0f * u);
++            draw->AddCircleFilled(ImVec2(x0 + 6.5f * u, yb + 1.0f * u), 3.5f * u, alpha(chip_blue, a), 12);
++            draw->AddCircleFilled(ImVec2(x0 + 19.5f * u, yb + 1.0f * u), 3.5f * u, alpha(chip_blue, a), 12);
++            draw->AddCircleFilled(ImVec2(x0 + 6.5f * u, yb + 1.0f * u), 2.5f * u, c, 12);
++            draw->AddCircleFilled(ImVec2(x0 + 19.5f * u, yb + 1.0f * u), 2.5f * u, c, 12);
++        }
++        if (r.car_count >= 2)
++            shadowed(draw, font, 22.0f * scale, ImVec2(a0.x + chip_h + 4.0f * scale, a0.y + 4.0f * scale), alpha(white, a), std::format("x{}", r.car_count));
++        shadowed(draw, font, text_size, ImVec2(left + 122.0f * scale + slide, a0.y + 2.0f * scale), alpha(white, a), with_commas(r.car_points));
++        y -= row_h;
++    }
++    // The bone chip on top: icon, count, points.
++    if (r.bone_points > 0) {
++        const float chip_h = row_h * 0.9f;
++        const ImVec2 a0(left + slide, y + (row_h - chip_h) * 0.5f);
++        draw->AddRectFilled(a0, ImVec2(left + 112.0f * scale + slide, a0.y + chip_h), alpha(chip_blue, a), 3.0f * scale);
++        if (has_art("bones")) image(draw, "bones", ImVec2(a0.x + 4.0f * scale, a0.y + 3.0f * scale), ImVec2(a0.x + chip_h - 3.0f * scale, a0.y + chip_h - 3.0f * scale), alpha(IM_COL32_WHITE, a));
++        // As homscoring.apt's UpdateBonus: the count reads "x2" and up, a single one shows no count.
++        if (r.broken.size() >= 2)
++            shadowed(draw, font, 22.0f * scale, ImVec2(a0.x + chip_h + 4.0f * scale, a0.y + 4.0f * scale), alpha(white, a), std::format("x{}", r.broken.size()));
++        shadowed(draw, font, text_size, ImVec2(left + 122.0f * scale + slide, a0.y + 2.0f * scale), alpha(white, a), with_commas(r.bone_points));
++    }
++}
++
++// The camera as it is now (the game moves it after the client tick), as the nametags read it.
++bool live_camera(std::uintptr_t base, std::array<float, 16> &world, float &fov) {
++    const auto view = latest_game_view();
++    if (!view) return false;
++    world = view->world;
++    fov = view->vertical_fov;
++    if (base && view->camera && !(view->camera & 7)) {
++        std::uintptr_t vtable{};
++        if (memory::peek(view->camera, vtable) &&
++            (vtable == base + addr::engine::camera_vtable || vtable == base + addr::client_source_spawn::free_camera_vtable)) {
++            std::array<float, 16> live{};
++            float live_fov{};
++            bool sound = memory::peek(view->camera + 0x50, live) && memory::peek(view->camera + 0xac, live_fov) && std::isfinite(live_fov) &&
++                         live_fov > 1 && live_fov < 175;
++            for (const auto value : live) sound = sound && std::isfinite(value) && std::abs(value) < 1e7f;
++            if (sound) {
++                world = live;
++                fov = live_fov;
++            }
++        }
++    }
++    return fov > 1 && fov < 175;
++}
++
++// One X-ray bone: a pale shaft with knobbed ends, glowing red and pulsing once broken, with a
++// white flash and a crack across it at the moment it went.
++void draw_bone(ImDrawList *draw, std::size_t index, ImVec2 a, ImVec2 b, float r, bool broken, float since_break, float fade) {
++    const ImU32 healthy = IM_COL32(190, 235, 255, 255), hurt = IM_COL32(255, 70, 40, 255), hot = IM_COL32(255, 200, 120, 255);
++    const float pulse = broken ? 0.75f + 0.25f * std::sin(static_cast<float>(ImGui::GetTime()) * 9.0f) : 1.0f;
++    const ImU32 colour = broken ? hurt : healthy;
++    const float base_alpha = (broken ? 0.95f : 0.42f) * fade;
++    // Glow.
++    for (int layer = 3; layer >= 1; --layer) {
++        const float w = r * (1.0f + 0.9f * layer) * (broken ? 1.3f : 1.0f);
++        const float a_ = base_alpha * (broken ? 0.16f : 0.07f) * pulse;
++        if (index == 0) draw->AddCircleFilled(ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), w * 1.2f, alpha(colour, a_), 24);
++        else draw->AddLine(a, b, alpha(colour, a_), w * 2.0f);
++    }
++    if (index == 0) {
++        // Skull: a round cranium with dark sockets.
++        const ImVec2 c((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
++        draw->AddCircleFilled(c, r * 1.15f, alpha(colour, base_alpha), 24);
++        draw->AddCircleFilled(ImVec2(c.x - r * 0.4f, c.y + r * 0.15f), r * 0.28f, alpha(IM_COL32(10, 12, 30, 255), base_alpha * 0.8f), 12);
++        draw->AddCircleFilled(ImVec2(c.x + r * 0.4f, c.y + r * 0.15f), r * 0.28f, alpha(IM_COL32(10, 12, 30, 255), base_alpha * 0.8f), 12);
++    } else {
++        const float shaft = index == 2 || index == 4 ? r * 1.6f : r * 1.1f;
++        draw->AddLine(a, b, alpha(colour, base_alpha), shaft);
++        draw->AddCircleFilled(a, r * 0.95f, alpha(colour, base_alpha), 16);
++        draw->AddCircleFilled(b, r * 0.95f, alpha(colour, base_alpha), 16);
++        if (index == 2) {
++            // Rib cage: ribs across the column.
++            const ImVec2 d(b.x - a.x, b.y - a.y);
++            const float l = std::max(1.0f, std::sqrt(d.x * d.x + d.y * d.y));
++            const ImVec2 n(-d.y / l, d.x / l);
++            for (int i = 1; i <= 4; ++i) {
++                const float t = i / 5.0f;
++                const ImVec2 m(a.x + d.x * t, a.y + d.y * t);
++                draw->AddLine(ImVec2(m.x - n.x * r * 2.2f, m.y - n.y * r * 2.2f), ImVec2(m.x + n.x * r * 2.2f, m.y + n.y * r * 2.2f),
++                              alpha(colour, base_alpha * 0.85f), std::max(1.5f, r * 0.35f));
++            }
++        }
++    }
++    if (broken) {
++        // The crack, and the flash when it snapped.
++        const ImVec2 m((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f);
++        const ImVec2 d(b.x - a.x, b.y - a.y);
++        const float l = std::max(1.0f, std::sqrt(d.x * d.x + d.y * d.y));
++        const ImVec2 n(-d.y / l, d.x / l), t(d.x / l, d.y / l);
++        const float s = r * 1.6f;
++        const ImVec2 zig[]{ImVec2(m.x - n.x * s, m.y - n.y * s), ImVec2(m.x - n.x * s * 0.3f + t.x * s * 0.35f, m.y - n.y * s * 0.3f + t.y * s * 0.35f),
++                           ImVec2(m.x + n.x * s * 0.3f - t.x * s * 0.35f, m.y + n.y * s * 0.3f - t.y * s * 0.35f), ImVec2(m.x + n.x * s, m.y + n.y * s)};
++        draw->AddPolyline(zig, 4, alpha(IM_COL32(20, 0, 0, 255), 0.9f * fade), 0, std::max(1.5f, r * 0.35f));
++        if (since_break < 0.6f) {
++            const float k = since_break / 0.6f;
++            draw->AddCircleFilled(m, s * (0.8f + 1.2f * k), alpha(hot, (1.0f - k) * 0.6f * fade), 24);
++            draw->AddCircle(m, s * (1.0f + 1.8f * k), alpha(IM_COL32_WHITE, (1.0f - k) * 0.7f * fade), 32, std::max(1.5f, r * 0.3f));
++        }
++    }
++}
++
++// The original's HoM grade, measured from its footage: the world goes dark, cool and nearly
++// colourless (ground about (30, 32, 50), edges near black), where the skater's own colours wash
++// out to blue-grey. Drawn as a cool wash over the whole picture plus a spotlight that falls to
++// near black away from the skater.
++void draw_grade(ImDrawList *draw, ImVec2 centre, float strength) {
++    if (strength <= 0.01f) return;
++    const auto display = ImGui::GetIO().DisplaySize;
++    // Measured against Skate 3's own footage (its settled X-ray): the lit ground around the skater is a
++    // cool, near-neutral grey-blue (about 37, 36, 45), falling to black by the corners, with no haze.
++    // Skate 3's colour matrix (half saturation, blue x1.2) is run on the game picture itself
++    // (hom_grade.cpp); here a dark blue wash brings it down to that level and a black spotlight closes in.
++    draw->AddRectFilled(ImVec2(0, 0), display, IM_COL32(8, 12, 24, static_cast<int>(0.55f * strength * 255.0f)));
++    const float h = display.y;
++    const float radii[]{0.22f * h, 0.42f * h, 0.70f * h, 1.7f * std::max(display.x, display.y)};
++    const float alphas[]{0.0f, 0.35f, 0.90f, 1.0f};
++    constexpr int segments = 48;
++    const auto uv = ImGui::GetFontTexUvWhitePixel();
++    for (int ring = 0; ring < 3; ++ring) {
++        draw->PrimReserve(segments * 6, segments * 4);
++        for (int k = 0; k < segments; ++k) {
++            const float a0 = k * 6.2831853f / segments, a1 = (k + 1) * 6.2831853f / segments;
++            const auto at = [&](float r, float angle) { return ImVec2(centre.x + std::cos(angle) * r, centre.y + std::sin(angle) * r); };
++            const ImU32 inner = IM_COL32(0, 1, 4, static_cast<int>(alphas[ring] * strength * 255.0f));
++            const ImU32 outer = IM_COL32(0, 1, 4, static_cast<int>(alphas[ring + 1] * strength * 255.0f));
++            const auto base = static_cast<ImDrawIdx>(draw->_VtxCurrentIdx);
++            draw->PrimWriteVtx(at(radii[ring], a0), uv, inner);
++            draw->PrimWriteVtx(at(radii[ring], a1), uv, inner);
++            draw->PrimWriteVtx(at(radii[ring + 1], a1), uv, outer);
++            draw->PrimWriteVtx(at(radii[ring + 1], a0), uv, outer);
++            draw->PrimWriteIdx(base);
++            draw->PrimWriteIdx(static_cast<ImDrawIdx>(base + 1));
++            draw->PrimWriteIdx(static_cast<ImDrawIdx>(base + 2));
++            draw->PrimWriteIdx(base);
++            draw->PrimWriteIdx(static_cast<ImDrawIdx>(base + 2));
++            draw->PrimWriteIdx(static_cast<ImDrawIdx>(base + 3));
++        }
++    }
++}
++
++// Scrolling film grain over the whole picture, one noise texel per screen pixel like the original's
++// noise pass (f_noise_texture scrolled every frame).
++void draw_grain(ImDrawList *draw, float strength) {
++    HomArt grain;
++    if (strength <= 0.01f || !hom_art("grain", grain)) return;
++    const auto display = ImGui::GetIO().DisplaySize;
++    // Skate 3's grain is coarse: about a pixel of its 720p picture, so the tile is scaled with the screen.
++    const float tile = 128.0f * std::max(1.0f, display.y / 720.0f);
++    static std::uint32_t seed = 12345u;
++    seed = seed * 1664525u + 1013904223u;
++    const float ox = -static_cast<float>(seed % 128u) * tile / 128.0f, oy = -static_cast<float>((seed >> 8) % 128u) * tile / 128.0f;
++    const ImU32 colour = IM_COL32(255, 255, 255, static_cast<int>(strength * 255.0f));
++    for (float y = oy; y < display.y; y += tile)
++        for (float x = ox; x < display.x; x += tile)
++            draw->AddImage(grain.texture, ImVec2(x, y), ImVec2(x + tile, y + tile), grain.uv0, grain.uv1, colour);
++}
++
++// The original's X-ray: the picture closes in to a dark, grainy spotlight on the skater, and only
++// the bones that got hurt show through the body: warm white, the broken ones orange, red at the break.
++void draw_xray(ImDrawList *draw, const Result &r, float bones_alpha, float fade, float darkness) {
++    const auto display = ImGui::GetIO().DisplaySize;
++    auto rig = skate3_hom::latest_rig();
++    if (rig.valid) {
++        // The pose was read at the client tick; carry each bone on so the X-ray keeps up with the
++        // body it is drawn over. Read from the physics bodies, the pose is this frame's: carry it only by the time since
++        // the read. From the animation pose (a frame behind) add that frame.
++        const float extra = skate3_hom::rig_from_bodies().load() ? 0.0f : rig.period;
++        const float lead = skate3_hom::bone_lead_ms().load() / 1000.0f;
++        const float ahead = std::clamp(static_cast<float>(std::chrono::duration<double>(Clock::now() - rig.at).count()) + extra + lead, 0.0f, 0.15f);
++        for (auto &seg : rig.bones)
++            for (std::size_t k = 0; k < 3; ++k) {
++                seg.a[k] += std::clamp(seg.va[k], -30.0f, 30.0f) * ahead;
++                seg.b[k] += std::clamp(seg.vb[k], -30.0f, 30.0f) * ahead;
++            }
++    }
++    BoneProjector projector;
++    float fov{};
++    const bool camera = rig.valid && live_camera(rig.base, projector.camera, fov);
++    if (camera) {
++        projector.focal = display.y / (2.0f * std::tan(fov * 3.14159265f / 360.0f));
++        projector.centre = ImVec2(display.x * 0.5f, display.y * 0.5f);
++    }
++    ImVec2 spot(display.x * 0.5f, display.y * 0.5f);
++    float spot_depth{};
++    if (camera) {
++        const auto &hips = rig.bones[4];
++        const std::array<float, 3> middle{(hips.a[0] + hips.b[0]) * 0.5f, (hips.a[1] + hips.b[1]) * 0.5f, (hips.a[2] + hips.b[2]) * 0.5f};
++        ImVec2 at;
++        if (projector.project(middle, at, spot_depth)) spot = at;
++    }
++    draw_grade(draw, spot, darkness * fade);
++    hom_colour_strength().store(std::clamp(darkness * fade, 0.0f, 1.0f));
++    {
++        // A break flashes the picture with the tint of Skate 3's hom_slomo_effect (0.4, 0.2, 0.2).
++        double last_break = -1;
++        for (const auto &b : r.broken) last_break = std::max(last_break, b.time);
++        const float since = last_break < 0 ? 1e9f : static_cast<float>(clock_seconds() - last_break);
++        if (since >= 0 && since < 0.8f)
++            draw->AddRectFilled(ImVec2(0, 0), display, IM_COL32(102, 51, 51, static_cast<int>(0.2f * (1.0f - since / 0.8f) * fade * 255.0f)));
++        // And the screen's edges pulse red, strongest at the snap.
++        if (since >= 0 && since < 1.2f) {
++            const float k = (1.0f - since / 1.2f) * (0.75f + 0.25f * std::cos(since * 18.0f)) * fade;
++            const ImU32 edge = IM_COL32(190, 25, 15, static_cast<int>(std::clamp(k, 0.0f, 1.0f) * 200.0f)), clear = IM_COL32(190, 25, 15, 0);
++            const float bx = display.x * 0.16f, by = display.y * 0.18f;
++            draw->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(display.x, by), edge, edge, clear, clear);
++            draw->AddRectFilledMultiColor(ImVec2(0, display.y - by), display, clear, clear, edge, edge);
++            draw->AddRectFilledMultiColor(ImVec2(0, 0), ImVec2(bx, display.y), edge, clear, clear, edge);
++            draw->AddRectFilledMultiColor(ImVec2(display.x - bx, 0), display, clear, edge, edge, clear);
++        }
++    }
++    draw_grain(draw, 0.5f * darkness * fade);
++    if (!camera) return;
++    std::array<bool, skate3_hom::rig_bones> broken{};
++    for (const auto &b : r.broken)
++        if (b.bone < broken.size()) broken[b.bone] = true;
++    const bool meshes = hom_bones_ready();
++    // Getting up, or the bail is over: the original's X-ray is gone (only the grade fades out).
++    if (bones_alpha <= 0.0f) return;
++    // The bones shown: every hurt one, and the spine between two shown ones so the column is whole.
++    std::array<bool, skate3_hom::rig_bones> shown{};
++    for (std::size_t i = 0; i < shown.size(); ++i) shown[i] = broken[i] || r.damage[i] > 0.0f;
++    if (shown[2] && shown[4]) shown[3] = true; // rib cage .. lower spine .. hips
++    if (shown[0] && shown[2]) shown[1] = true; // skull .. neck .. rib cage
++    // How orange a bone is: Skate 3 keeps bruised and scraped bones white and turns them orange
++    // from a bad sprain on, all the way at a break.
++    const auto heat_of = [&](std::size_t i) { return broken[i] ? 1.0f : std::clamp((r.damage[i] - 0.3f) / 0.65f, 0.0f, 1.0f); };
++    // Skate 3's three stages, measured from its footage through the bone map: white, a peach
++    // orange, then red-orange (about (207, 63, 13) on screen at a break).
++    const auto stage_colour = [](float t) {
++        const auto lerp8 = [](int x, int y, float u) { return static_cast<int>(static_cast<float>(x) + static_cast<float>(y - x) * u); };
++        if (t < 0.5f) {
++            const float u = t / 0.5f;
++            return IM_COL32(lerp8(255, 255, u), lerp8(248, 182, u), lerp8(250, 150, u), 255);
++        }
++        const float u = (t - 0.5f) / 0.5f;
++        return IM_COL32(lerp8(255, 245, u), lerp8(182, 74, u), lerp8(150, 16, u), 255);
++    };
++    // Skate 3's hurt bones glow orange through the body, hotter the worse the damage; a break
++    // burns red-orange and throbs. Measured from the original: core (255, 190, 170), glow
++    // (250, 150, 126) out to (146, 45, 36) at its edge, through its colour matrix.
++    for (std::size_t i = 0; i < skate3_hom::rig_bones; ++i) {
++        const float heat = heat_of(i);
++        if (!shown[i]) continue;
++        const auto &seg = rig.bones[i];
++        ImVec2 a, b;
++        float da{}, db{};
++        if (!projector.project(seg.a, a, da) || !projector.project(seg.b, b, db)) continue;
++        const float px = std::clamp(seg.radius * projector.focal * 2.0f / (da + db), 1.5f, 80.0f);
++        const float throb = broken[i] ? 0.8f + 0.2f * std::sin(static_cast<float>(ImGui::GetTime()) * 7.0f) : 1.0f;
++        // Skate 3's bloom: cool white round white bones, red-orange round hurt ones.
++        const auto lerp8 = [](int x, int y, float t) { return static_cast<int>(static_cast<float>(x) + static_cast<float>(y - x) * t); };
++        // A faint red glow round the hot ones only; white bones in Skate 3 have none.
++        if (heat < 0.4f) continue;
++        (void)lerp8;
++        const ImU32 glow = IM_COL32(255, 80, 30, 255);
++        for (int layer = 4; layer >= 1; --layer) {
++            const float w = px * (1.3f + 0.8f * layer);
++            const float k = 0.05f * (heat - 0.3f) * throb * fade * bones_alpha;
++            if (i == 0) draw->AddCircleFilled(ImVec2((a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f), w, alpha(glow, k), 24);
++            else {
++                draw->AddLine(a, b, alpha(glow, k), w * 2.0f);
++                draw->AddCircleFilled(a, w, alpha(glow, k * 0.6f), 16);
++                draw->AddCircleFilled(b, w, alpha(glow, k * 0.6f), 16);
++            }
++        }
++    }
++    for (int pass = 0; pass < 2; ++pass)
++        for (std::size_t i = 0; i < skate3_hom::rig_bones; ++i) {
++            const float damage = r.damage[i];
++            if (!shown[i]) continue;
++            if (broken[i] != (pass == 1)) continue;
++            const auto &seg = rig.bones[i];
++            if (!meshes) {
++                ImVec2 a, b;
++                float da{}, db{};
++                if (!projector.project(seg.a, a, da) || !projector.project(seg.b, b, db)) continue;
++                const float px = std::clamp(seg.radius * projector.focal * 2.0f / (da + db), 1.5f, 80.0f);
++                draw_bone(draw, i, a, b, px, broken[i], 1.0f, fade * bones_alpha);
++                continue;
++            }
++            // Bruised up to dislocated shows faint to full; broken in the fracture colours.
++            const float strength = broken[i] ? 1.0f : std::clamp(0.75f + 0.25f * damage, 0.75f, 1.0f);
++            // Skate 3's colours, measured from the original: hurt (223, 212, 214), broken (198, 87, 64),
++            // fracture (158, 43, 23), after its bone map; these tints give those through the map.
++            // Lightly hurt stays bone white; from sprained on it heats up to orange, broken burns red-orange.
++            const float heat = heat_of(i);
++            const auto mix = [](int x, int y, float t) { return static_cast<int>(static_cast<float>(x) + (static_cast<float>(y) - static_cast<float>(x)) * t); };
++            // The rim colour (the core runs to white): Skate 3's cool white, heating to its red-orange.
++            const ImU32 tint = stage_colour(heat);
++            (void)mix;
++            const auto &facing = seg.has_front && skate3_hom::roll_from_joints().load() ? seg.front : rig.forward;
++            draw_hom_bone(draw, projector, i, seg.a, seg.b, facing, tint, strength * fade * bones_alpha, 0.0f);
++        }
++}
++
++} // namespace
++
++// Game thread, once per client tick after the trainer has published its telemetry.
++void skate3_hom_tick(bool stand_down) {
++    auto &s = state();
++    const auto telemetry = trainer::telemetry();
++    std::lock_guard lock(s.mutex);
++    // Off while its asset mod is not installed or is turned off in the MODS tab.
++    if (stand_down || !telemetry.skater || hom_directory().empty()) {
++        if (s.tracker.phase() == Phase::bailing) s.tracker.reset();
++        s.visible_until = 0;
++        skate3_hom::hide_game_ui().store(false);
++        s.last_time = -1;
++        return;
++    }
++    const double now = clock_seconds();
++    if (now == s.last_time) return;
++    s.last_time = now;
++    Sample in;
++    in.time = now;
++    in.position = telemetry.position;
++    in.speed = telemetry.speed;
++    in.vertical = telemetry.vertical;
++    in.airborne = telemetry.airborne;
++    in.physics_state = telemetry.physics_state;
++    in.heading = telemetry.heading;
++    if (const auto rig = skate3_hom::latest_rig(); rig.valid) {
++        in.bones_valid = true;
++        in.upright = skate3_hom::rig_upright().load();
++        in.lying = skate3_hom::rig_lying().load();
++        in.vehicle = skate3_hom::vehicle_contact().load();
++        in.ragdoll = skate3_hom::rig_ragdoll().load();
++        for (std::size_t i = 0; i < skate3_hom::rig_bones; ++i)
++            for (std::size_t k = 0; k < 3; ++k) in.bone_centres[i][k] = (rig.bones[i].a[k] + rig.bones[i].b[k]) * 0.5f;
++    }
++    // Tuning logs (--log-level=debug): every physics state change, a heartbeat, and what the crash
++    // test sees off the board, so a missed bail can be traced. Nothing is formatted otherwise.
++    const bool tracing = logging::enabled(logging::Level::debug);
++    if (tracing && in.physics_state != s.last_state && s.tracker.phase() != Phase::bailing)
++        logging::log(logging::Level::debug, logging::Channel::assets, "Hall Of Meat: state {} -> {} ({:.1f} km/h, airborne {}).",
++                     s.last_state, in.physics_state, in.speed * 3.6f, in.airborne);
++    if (tracing && now - s.heartbeat > 10.0) {
++        s.heartbeat = now;
++        logging::log(logging::Level::debug, logging::Channel::assets, "Hall Of Meat: watching, state {}, skeleton {}.", in.physics_state,
++                     in.bones_valid ? "read" : "not read");
++    }
++    if (tracing && s.tracker.phase() == Phase::bailing && in.physics_state != s.last_state)
++        logging::log(logging::Level::debug, logging::Channel::assets, "Hall Of Meat: physics state {} -> {} at {:.1f} km/h.",
++                     s.last_state, in.physics_state, in.speed * 3.6f);
++    s.last_state = in.physics_state;
++    // Off the board and not bailing: four times a second, what the crash test sees (for tuning).
++    if (tracing && s.tracker.phase() != Phase::bailing && in.physics_state == 504 && !in.upright && now - s.watch_logged >= 0.25) {
++        s.watch_logged = now;
++        logging::log(logging::Level::debug, logging::Channel::assets, "Hall Of Meat: off board, {}.", s.tracker.watch_line());
++    }
++    const bool was_bailing = s.tracker.phase() == Phase::bailing;
++    const bool done = s.tracker.update(in);
++    skate3_hom::hide_game_ui().store(s.tracker.showing() || now < s.visible_until);
++    if (s.tracker.cancelled() != s.cancelled_seen) {
++        s.cancelled_seen = s.tracker.cancelled();
++        logging::log(logging::Level::info, logging::Channel::assets, "Hall Of Meat: that was a glide landing, not a crash: taken back.");
++    }
++    if (!was_bailing && s.tracker.phase() == Phase::bailing && s.tracker.carried_on()) {
++        // The same crash carrying on (a second drop): the panel stays up and the X-ray comes back.
++        s.upright_since = s.getting_up_at = -1;
++        logging::log(logging::Level::debug, logging::Channel::assets, "Hall Of Meat: bail {} carries on.", s.tracker.live().serial);
++    } else if (!was_bailing && s.tracker.phase() == Phase::bailing) {
++        s.started = now;
++        s.shown_total = 0;
++        // Calibration: the X-ray skull and pelvis against the skater's own position.
++        if (const auto rig = skate3_hom::latest_rig(); rig.valid)
++            logging::log(logging::Level::info, logging::Channel::assets,
++                         "Hall Of Meat: bail started by {}: skater ({:.2f}, {:.2f}, {:.2f}), skull ({:.2f}, {:.2f}, {:.2f}), hips ({:.2f}, {:.2f}, {:.2f}); {}.",
++                         s.tracker.trigger(), in.position[0], in.position[1], in.position[2], rig.bones[0].a[0], rig.bones[0].a[1], rig.bones[0].a[2],
++                         rig.bones[4].a[0], rig.bones[4].a[1], rig.bones[4].a[2], s.tracker.watch_line());
++        else
++            logging::log(logging::Level::debug, logging::Channel::assets, "Hall Of Meat: skeleton not readable at bail start.");
++    }
++    {
++        // Each new damage level is heard, as Skate 3 plays its HoM bone sounds.
++        const Result &r = s.tracker.phase() == Phase::bailing ? s.tracker.live() : s.tracker.result();
++        // A bail not yet known to be a crash (a glide's landing) is not heard until it is.
++        const bool hold = s.tracker.phase() == Phase::bailing && !s.tracker.showing();
++        if (r.serial != s.sounded_serial) {
++            s.sounded_serial = r.serial;
++            s.sounded = 0;
++        }
++        for (; !hold && s.sounded < r.events.size(); ++s.sounded) {
++            const auto &e = r.events[s.sounded];
++            const int n = std::max(1, level_count(static_cast<std::size_t>(e.part)));
++            skate3_hom::play_bone_sound(static_cast<float>(e.level) / static_cast<float>(n), e.top);
++        }
++    }
++    {
++        // A new break (once the bail is known to be a crash) starts Skate 3's slow motion.
++        const Result &live = s.tracker.live();
++        if (s.tracker.showing()) {
++            if (live.serial != s.breaks_serial) {
++                s.breaks_serial = live.serial;
++                s.breaks_seen = 0;
++            }
++            if (live.broken.size() > s.breaks_seen) {
++                // Its sound once per slow motion: a break inside one already running only extends it.
++                if (s.break_real < 0 || real_seconds() - s.break_real > 2.15) s.whoosh_pending = true;
++                s.break_real = real_seconds();
++            }
++            s.breaks_seen = live.broken.size();
++        }
++    }
++    if (!was_bailing && s.tracker.phase() == Phase::bailing && !s.tracker.carried_on()) s.new_best = false;
++    if (done) {
++        const auto &r = s.tracker.result();
++        s.visible_until = now + linger_seconds + fade_seconds;
++        if (r.total > s.best) {
++            s.new_best = s.best_known && r.total > 0;
++            s.best = r.total;
++            if (s.best_known && !s.level.empty()) profile_runtime::set_local_values({{best_key(s.level), static_cast<double>(s.best)}});
++        }
++        logging::log(logging::Level::info, logging::Channel::assets,
++                     "Hall Of Meat: bail {} scored {} (bones {} {}, air {:.2f}s {}, drop {:.1f}m {}, time {:.2f}s {}, speed {:.1f}m/s {}, rot {:.0f} {}) - {}.",
++                     r.serial, r.total, r.broken.size(), r.bone_points, r.air_time, r.air_points, r.drop, r.drop_points, r.duration,
++                     r.duration_points, r.peak_speed, r.speed_points, r.rotation, r.rotation_points, r.title);
++    }
++}
++
++void skate3_hom_set_level(std::string_view level) {
++    auto &s = state();
++    std::lock_guard lock(s.mutex);
++    // The saved X-ray lead, once.
++    static bool lead_loaded = false;
++    if (!lead_loaded) {
++        lead_loaded = true;
++        if (const auto saved = profile_runtime::local_value("Skate3HallOfMeat.LeadMs")) {
++            try {
++                const double ms = saved->get<double>();
++                if (std::isfinite(ms)) skate3_hom::bone_lead_ms().store(std::clamp(static_cast<float>(ms), -50.0f, 60.0f));
++            } catch (...) {}
++        }
++    }
++    if (level == s.level) return;
++    s.level = level;
++    s.best_known = !level.empty();
++    s.best = 0;
++    s.new_best = false;
++    if (s.best_known)
++        if (const auto saved = profile_runtime::local_value(best_key(level))) {
++            try {
++                const double best = saved->get<double>();
++                if (std::isfinite(best) && best > 0 && best < 1e9) s.best = static_cast<int>(best);
++            } catch (...) {}
++        }
++}
++
++float skate3_hom_game_speed() {
++    auto &s = state();
++    std::lock_guard lock(s.mutex);
++    return s.break_real < 0 ? 1.0f : slow_motion_curve(real_seconds() - s.break_real);
++}
++
++void skate3_hom_set_applied_speed(float speed) {
++    applied_speed().store(std::isfinite(speed) ? std::clamp(speed, 0.05f, 1.0f) : 1.0f);
++    auto &s = state();
++    bool whoosh = false;
++    {
++        std::lock_guard lock(s.mutex);
++        if (s.whoosh_pending && speed < 1.0f) whoosh = true;
++        // Refused (a multiplayer session): no slow motion, no sound for it.
++        if (whoosh || real_seconds() - s.break_real > 0.3) s.whoosh_pending = false;
++    }
++    if (whoosh) skate3_hom::play_slow_motion_sound();
++}
++
++bool skate3_hom_installed() { return !hom_directory().empty(); }
++
++bool skate3_hom_hud_pending() {
++    auto &s = state();
++    std::lock_guard lock(s.mutex);
++    return s.tracker.showing() || clock_seconds() < s.visible_until;
++}
++
++std::string skate3_hom_command(std::string_view verb, const std::vector<std::string> &words) {
++    auto &s = state();
++    std::lock_guard lock(s.mutex);
++    if (verb == "lead") {
++        if (!words.empty()) {
++            float ms{};
++            try {
++                ms = std::clamp(std::stof(words[0]), -50.0f, 60.0f);
++            } catch (...) {
++                return "Hall Of Meat: hom lead <milliseconds>, -50 to 60.";
++            }
++            skate3_hom::bone_lead_ms().store(ms);
++            profile_runtime::set_local_values({{"Skate3HallOfMeat.LeadMs", static_cast<double>(ms)}});
++        }
++        return std::format("Hall Of Meat: the X-ray is carried {:.0f} ms further ahead of the skeleton read.", skate3_hom::bone_lead_ms().load());
++    }
++    if (verb == "roll") {
++        if (!words.empty()) skate3_hom::roll_from_joints().store(words[0] != "0");
++        return std::string("Hall Of Meat: bone roll from ") + (skate3_hom::roll_from_joints().load() ? "the joints." : "the body forward.");
++    }
++    if (verb == "phys") {
++        skate3_hom::phys_probe_requested().store(true);
++        return "Hall Of Meat: reading the physics bodies, see ReSkate.log.";
++    }
++    if (verb == "rig") {
++        skate3_hom::rig_probe_requested().store(true);
++        return "Hall Of Meat: reading the skeleton, see ReSkate.log.";
++    }
++    if (verb == "status") {
++        return std::format("Hall Of Meat: {}, best bail {}.", s.tracker.phase() == Phase::bailing ? "bailing" : "watching", s.best);
++    }
++    return "Hall Of Meat: status, rig, phys, roll 0|1.";
++}
++
++void draw_skate3_hom_hud() {
++    auto &s = state();
++    const auto display = ImGui::GetIO().DisplaySize;
++    if (display.x <= 0 || display.y <= 0) return;
++    const float scale = std::clamp(display.y / 1080.0f, 0.75f, 2.5f);
++    auto *draw = ImGui::GetBackgroundDrawList();
++    std::lock_guard lock(s.mutex);
++    hom_colour_strength().store(0.0f);
++    const double now = clock_seconds();
++    const bool live = s.tracker.showing();
++    if (!live && now >= s.visible_until) return;
++    const Result &r = live ? s.tracker.live() : s.tracker.result();
++    float fade = 1.0f;
++    if (!live) fade = static_cast<float>(std::clamp((s.visible_until - now) / fade_seconds, 0.0, 1.0));
++    // The score counts up toward its target.
++    const float target = static_cast<float>(r.total);
++    s.shown_total += (target - s.shown_total) * std::min(1.0f, ImGui::GetIO().DeltaTime * 8.0f);
++    if (std::abs(target - s.shown_total) < 1.0f) s.shown_total = target;
++    {
++        // Darkness: deep once the body is settling (as the original reveals its X-ray), lighter mid-tumble.
++        const float dark_target = live ? ((s.tracker.live().duration > 0.7f) ? 1.0f : 0.5f) : 0.0f;
++        s.darkness += (dark_target - s.darkness) * std::min(1.0f, ImGui::GetIO().DeltaTime * 4.0f);
++        // Getting up ends the X-ray for good: once the skater has been upright for a moment the bones
++        // fade out and stay gone, however the body bends on the way up (it flickered on and off before).
++        if (live) {
++            if (r.serial != s.xray_serial) {
++                s.xray_serial = r.serial;
++                s.upright_since = s.getting_up_at = -1;
++            }
++            if (s.tracker.getting_up()) {
++                if (s.upright_since < 0) s.upright_since = now;
++                if (s.getting_up_at < 0 && now - s.upright_since >= 0.12) s.getting_up_at = now;
++            } else {
++                s.upright_since = -1;
++            }
++        }
++        const float bones_alpha = !live ? 0.0f : s.getting_up_at < 0 ? 1.0f
++                                                 : std::clamp(1.0f - static_cast<float>(now - s.getting_up_at) / 0.25f, 0.0f, 1.0f);
++        if (live || s.darkness > 0.02f) draw_xray(draw, r, bones_alpha, live ? 1.0f : fade, s.darkness);
++    }
++    draw_block(draw, r, s.shown_total, fade, scale, now, s.started, s.best_known ? s.best : 0, s.new_best);
++}
++} // namespace dingosdk::overlay
+diff --git a/Extension/Skate3HallOfMeat/s3hom_hud.h b/Extension/Skate3HallOfMeat/s3hom_hud.h
+new file mode 100644
+index 0000000..4dac7f4
+--- /dev/null
++++ b/Extension/Skate3HallOfMeat/s3hom_hud.h
+@@ -0,0 +1,25 @@
++#pragma once
++#include <string>
++#include <string_view>
++#include <vector>
++// Hall Of Meat on screen: samples the trainer's skater telemetry every presented frame, runs the
++// bail tracker and draws the live bail and the result card. Presentation thread only.
++namespace dingosdk::overlay {
++// Game thread: once per client tick, after the trainer has published its telemetry.
++// `stand_down` while ReSkate's own Hall of Meat is on: this one shows nothing then.
++void skate3_hom_tick(bool stand_down = false);
++// True while a bail is live or a result is on screen (also keeps frames coming so bails are seen).
++bool skate3_hom_hud_pending();
++// Its asset pack is installed and switched on (nothing is read from the game otherwise).
++bool skate3_hom_installed();
++// Game thread, with the map being played (empty without one): loads that map's best bail.
++void skate3_hom_set_level(std::string_view level);
++// Skate 3's broken-bone slow motion (IsBrokenBoneSlowMo): the game speed a break asks for now
++// (1 when none), and the speed the game actually runs at (the slow motion may be refused, as in a
++// multiplayer session). The bail is timed on the game's clock.
++float skate3_hom_game_speed();
++void skate3_hom_set_applied_speed(float speed);
++void draw_skate3_hom_hud();
++// `hom <verb> ...` console commands (any thread).
++std::string skate3_hom_command(std::string_view verb, const std::vector<std::string> &words);
++} // namespace dingosdk::overlay
+diff --git a/Extension/UI/Overlay/overlay_render.cpp b/Extension/UI/Overlay/overlay_render.cpp
+index a1f0584..16a1095 100644
+--- a/Extension/UI/Overlay/overlay_render.cpp
++++ b/Extension/UI/Overlay/overlay_render.cpp
+@@ -4,6 +4,9 @@
+ #include "overlay_internal.h"
+ #include "Extension/Trainer/trainer_page.h"
+ #include "Extension/HallOfMeat/hall_of_meat_overlay.h"
++#include "Extension/Skate3HallOfMeat/hom_art.h"
++#include "Extension/Skate3HallOfMeat/hom_grade.h"
++#include "Extension/Skate3HallOfMeat/s3hom_hud.h"
+ #include "park_previews.h"
+ #include "chat_emotes.h"
+ #include "input_capture.h"
+@@ -71,6 +74,7 @@ void destroy_graphics() {
+     s.win32_ready = s.dx12_ready = s.ready = false;
+     s.ui_was_interactive = false;
+     s.frames.clear();
++    hom_grade_release();
+     s.commands.Reset(); s.rtvs.Reset(); s.srvs.Reset(); s.fence.Reset(); s.device.Reset();
+     if (s.fence_event) CloseHandle(s.fence_event);
+     s.fence_event = nullptr;
+@@ -314,9 +318,11 @@ bool setup_graphics() {
+     // Emotes and Hall of Meat's images reserve their room before the park previews build the atlas, and fill it after.
+     const auto emote_count = reserve_chat_emotes(*ImGui::GetIO().Fonts, std::chrono::seconds(5));
+     reserve_hall_of_meat_images(*ImGui::GetIO().Fonts, std::chrono::seconds(5));
++    reserve_hom_art(*ImGui::GetIO().Fonts);
+     const auto preview_count = load_park_previews(*ImGui::GetIO().Fonts, std::chrono::seconds(5));
+     fill_chat_emotes(*ImGui::GetIO().Fonts);
+     fill_hall_of_meat_images(*ImGui::GetIO().Fonts);
++    fill_hom_art(*ImGui::GetIO().Fonts);
+     if (emote_count)
+         dingosdk::logging::printf(dingosdk::logging::Level::info, dingosdk::logging::Channel::graphics,
+             "Chat emotes: %zu ready.", emote_count);
+@@ -481,7 +487,7 @@ void render(IDXGISwapChain* presented, UINT flags) {
+     const bool skate_hud_frame = skate_hud_pending();
+     const bool nametag_frame = nametags_pending();
+     const bool meat_frame = hall_of_meat_pending();
+-    const bool perf_frame = perf_hud_pending() || trainer_hud_pending();
++    const bool perf_frame = perf_hud_pending() || trainer_hud_pending() || skate3_hom_hud_pending();
+     if (trainer_open_requested()) s.visible.store(true);
+     const bool menu_frame = interactive_visible(s);
+     if (!menu_frame) {
+@@ -552,6 +558,7 @@ void render(IDXGISwapChain* presented, UINT flags) {
+     draw_skate_hud();
+     draw_perf_hud();
+     draw_trainer_hud();
++    draw_skate3_hom_hud();
+     draw_notices();
+     draw_chat();
+     sync_menu_cursor(); // close buttons also change visibility, without a key message
+@@ -578,7 +585,10 @@ void render(IDXGISwapChain* presented, UINT flags) {
+     barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+-    s.commands->ResourceBarrier(1, &barrier);
++    // Skate 3 Hall of Meat's colour pass (Skate 3's colour matrix on the game picture) leaves the
++    // buffer as a render target itself; otherwise it becomes one here.
++    if (!hom_grade_record(s.device.Get(), s.commands.Get(), frame.buffer.Get(), frame.rtv, hom_colour_strength().load()))
++        s.commands->ResourceBarrier(1, &barrier);
+     s.commands->OMSetRenderTargets(1, &frame.rtv, FALSE, nullptr);
+     ID3D12DescriptorHeap* heaps[] = {s.srvs.Get()};
+     s.commands->SetDescriptorHeaps(1, heaps);
+diff --git a/Launcher/Test/mod_manager_tests.cpp b/Launcher/Test/mod_manager_tests.cpp
+index e16c901..2a25853 100644
+--- a/Launcher/Test/mod_manager_tests.cpp
++++ b/Launcher/Test/mod_manager_tests.cpp
+@@ -313,6 +313,13 @@ int main() {
+         check(park && park->author == "Someone" && park->park_maps == std::vector<std::string>{"bam"},
+               "An author the manifest already names is kept");
+ 
++        make_zip(sources / L"meat.zip", {{"manifest.json", R"({"name":"Hall_of_Meat","version_number":"1.0.0"})"},
++            {"icon.png", "png"}, {"README.md", "readme"}, {"HallOfMeat/bones.bin", "HOM2"}, {"HallOfMeat/art/thrasher.png", "png"}});
++        options.folder = "Team-Hall_of_Meat";
++        check(launcher_mods::install(store, sources / L"meat.zip", true, {}, cancel, options) == "Team-Hall_of_Meat" &&
++                  read(store / L"Team-Hall_of_Meat" / L"HallOfMeat" / L"bones.bin") == "HOM2",
++              "A Hall of Meat asset package installs with its HallOfMeat folder");
++
+         make_zip(sources / L"empty.zip", {{"manifest.json", manifest}, {"icon.png", "png"}, {"README.md", "readme"}});
+         options.folder = "Team-Empty";
+         check(error_of([&] { launcher_mods::install(store, sources / L"empty.zip", true, {}, cancel, options); })
+diff --git a/Launcher/mod_manager.cpp b/Launcher/mod_manager.cpp
+index 499d750..d540f89 100644
+--- a/Launcher/mod_manager.cpp
++++ b/Launcher/mod_manager.cpp
+@@ -30,6 +30,9 @@ constexpr std::array<std::string_view, 2> info_markers{"manifest.json", "reskate
+ // follow the mod in when it is packed one folder deeper.
+ constexpr std::array<std::string_view, 4> package_files{"manifest.json", "icon.png", "readme.md", "changelog.md"};
+ constexpr char no_mod[] = " does not contain a ReSkate mod (no layout.toc, reskate-levels.json or manifest.json).";
++// Hall Of Meat's assets (HallOfMeat/bones.bin, see Extension/Skate3HallOfMeat/hom_art.h) are something the game loads.
++constexpr std::string_view hall_of_meat_folder = "hallofmeat";
++constexpr std::string_view hall_of_meat_marker = "bones.bin";
+ // Staging lives inside Mods so the final move is a rename on one volume; the
+ // leading dot keeps the runtime from ever treating it as a mod.
+ constexpr wchar_t staging_folder[] = L".reskate-install";
+@@ -84,8 +87,8 @@ struct Root {
+     bool content{};       // holds something the game loads
+ };
+ 
+-// The shallowest folder holding game content (layout.toc, reskate-levels.json
+-// or parks/<map>.park.json), else the shallowest holding only a description.
++// The shallowest folder holding game content (layout.toc, reskate-levels.json,
++// parks/<map>.park.json or HallOfMeat/bones.bin), else the shallowest holding only a description.
+ // Content wins so a package's own manifest.json at the top cannot hide a mod
+ // packed one folder down.
+ std::optional<Root> mod_root(const std::vector<std::string>& files) {
+@@ -100,6 +103,10 @@ std::optional<Root> mod_root(const std::vector<std::string>& files) {
+             folder.resize(folder.size() - std::string_view("parks/").size());
+             is_content = true;
+         }
++        if (!is_content && lower(leaf) == hall_of_meat_marker && lower(last_folder(folder)) == hall_of_meat_folder) {
++            folder.resize(folder.size() - hall_of_meat_folder.size() - 1);
++            is_content = true;
++        }
+         const auto depth = static_cast<std::size_t>(std::count(folder.begin(), folder.end(), '/'));
+         if (is_content && depth < content_depth) { content = folder; content_depth = depth; }
+         if (!is_content && one_of(info_markers, leaf) && depth < info_depth) { info = folder; info_depth = depth; }
+@@ -150,8 +157,8 @@ std::string mod_name(const Root& root, const std::string& source_name, const Ins
+ // refused when asked, and the author goes into manifest.json.
+ void finish(const fs::path& staging, const Root& root, const std::string& source_name, const InstallOptions& options) {
+     if (options.require_content && !root.content)
+-        fail(source_name + " has nothing for ReSkate to load: no layout.toc, reskate-levels.json or parks folder. "
+-             "Only mods built with ReSkate Studio, and park mods, can be installed.");
++        fail(source_name + " has nothing for ReSkate to load: no layout.toc, reskate-levels.json, parks or HallOfMeat folder. "
++             "Only mods built with ReSkate Studio, park mods and Hall of Meat asset packs can be installed.");
+     const auto manifest = staging / mods::manifest_file;
+     std::error_code error;
+     if (options.author.empty() || !fs::is_regular_file(manifest, error)) return;
+diff --git a/Runtime/client_tick.cpp b/Runtime/client_tick.cpp
+index 1140240..a7516a6 100644
+--- a/Runtime/client_tick.cpp
++++ b/Runtime/client_tick.cpp
+@@ -28,6 +28,9 @@
+ #include "Extension/Skater/skater_slot_override.h"
+ #include "Extension/Throwdowns/native_throwdowns.h"
+ #include "Extension/Trainer/trainer.h"
++#include "Extension/Skate3HallOfMeat/s3hom_hud.h"
++#include "Extension/Skate3HallOfMeat/hom_rig.h"
++#include "Extension/HallOfMeat/hall_of_meat_slow_motion.h"
+ #include "Extension/World/level_loading.h"
+ #include "Extension/World/loading_screen.h"
+ #include <dxgi.h>
+@@ -1146,6 +1149,21 @@ void tick(std::uintptr_t client, std::uintptr_t update) {
+             // A custom map is a sublevel of the root level: that is the map the player means.
+             dingosdk::trainer::tick(r.base, client, multiplayer_ready, r.catalog_level.empty() ? r.last_level : r.catalog_level);
+         }
++        {
++            DINGO_PROFILE_ZONE("tick/Skate 3 Hall Of Meat");
++            // Stands down while ReSkate's own Hall of Meat is switched on: one at a time.
++            // Off (ReSkate's own Hall of Meat on, or the asset pack off): nothing of the skater is read.
++            const bool official = dingosdk::hall_of_meat::enabled() || !dingosdk::overlay::skate3_hom_installed();
++            dingosdk::overlay::skate3_hom_set_level(r.catalog_level.empty() ? r.last_level : r.catalog_level);
++            if (!official) dingosdk::skate3_hom::rig_tick(r.base, client);
++            dingosdk::overlay::skate3_hom_tick(official);
++            // Skate 3's broken-bone slow motion: never in a multiplayer session (SlowMotion refuses
++            // it there), and given back while ReSkate's own Hall of Meat runs its own.
++            static dingosdk::hall_of_meat::SlowMotion skate3_slow_motion;
++            const float speed = official ? 1.0f : dingosdk::overlay::skate3_hom_game_speed();
++            const bool slowed = skate3_slow_motion.set(speed);
++            dingosdk::overlay::skate3_hom_set_applied_speed(slowed && speed < 1.0f ? speed : 1.0f);
++        }
+         {
+             DINGO_PROFILE_ZONE("tick/Steam friend join");
+             dingosdk::multiplayer::tick_steam_friend_join();
+diff --git a/cmake/Runtime.cmake b/cmake/Runtime.cmake
+index 482299f..544e3f6 100644
+--- a/cmake/Runtime.cmake
++++ b/cmake/Runtime.cmake
+@@ -125,6 +125,8 @@ add_library(dingosdk_runtime SHARED
+     Extension/Trainer/trainer_jump.cpp
+     Extension/Trainer/trainer_classes.cpp
+     Extension/Trainer/trainer_commands.cpp
++    Extension/Skate3HallOfMeat/hom_commands.cpp
++    Extension/Skate3HallOfMeat/hom_rig.cpp
+     Extension/Trainer/trainer_session.cpp
+     Extension/Trainer/trainer_waypoint.cpp
+     Extension/Skater/offboard_flight.cpp
+diff --git a/cmake/UI.cmake b/cmake/UI.cmake
+index ad8d677..4e5f182 100644
+--- a/cmake/UI.cmake
++++ b/cmake/UI.cmake
+@@ -37,6 +37,12 @@ add_library(dingosdk_overlay STATIC
+     Extension/UI/Overlay/multiplayer_session.cpp
+     Extension/Trainer/trainer_page.cpp
+     Extension/Trainer/trainer_view.cpp
++    Extension/Skate3HallOfMeat/hom_core.cpp
++    Extension/Skate3HallOfMeat/hom_art.cpp
++    Extension/Skate3HallOfMeat/hom_bones.cpp
++    Extension/Skate3HallOfMeat/s3hom_hud.cpp
++    Extension/Skate3HallOfMeat/hom_audio.cpp
++    Extension/Skate3HallOfMeat/hom_grade.cpp
+     Extension/HallOfMeat/hall_of_meat_overlay.cpp
+ )
+ target_link_libraries(dingosdk_overlay PUBLIC dingosdk_logging dingosdk_profiler dingosdk_imgui dingosdk_hooks dingosdk_console_core dxguid PRIVATE dingosdk_playstation_input shell32 dingosdk_initfs dingosdk_custom_scripts dingosdk_game_archives dingosdk_mods dingosdk_json windowscodecs ole32)
