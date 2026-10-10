@@ -31,34 +31,27 @@ Both can be installed: this one steps aside whenever ReSkate's is switched on, s
 
 ## Download
 
-- **Thunderstore:** https://thunderstore.io/c/reskate/p/Kitty_Meow/Hall_of_Meat/ (the asset pack)
+**[⬇ Hall-of-Meat-Complete (latest release)](https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest)**: everything in one zip, the ReSkate build with Hall of Meat and the asset pack.
 
-- **[Latest release](https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest)** (also on the
-  [ReSkate fork](https://github.com/layton-brewer/ReSkate-Hall-Of-Meat/releases/latest)):
-  - `ReSkate-HallOfMeat-<version>.zip`: ReSkateLauncher.exe and ReSkate.dll (official ReSkate v2.0.1 plus
-    Skate 3 Hall of Meat, so multiplayer works with everyone on v2.0.1).
-  - `Hall_of_Meat-<version>.zip`: the asset pack (Thunderstore format).
-- Leave ReSkate's own Hall of Meat off (Custom Stuff > Player > Hall of Meat) to see this one.
+Also on Thunderstore (the asset pack only): https://thunderstore.io/c/reskate/p/Kitty_Meow/Hall_of_Meat/
 
 ## Install
 
-You need two things: **ReSkate with Skate 3 Hall of Meat** (the code) and the **Hall of Meat asset
-pack** (Skate 3's bones, art and sounds).
-
 1. **Close the game.**
-2. **ReSkate with Skate 3 Hall of Meat.** Download `ReSkate-HallOfMeat-<version>.zip` from the
-   [latest release](https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest). Copy
-   `ReSkateLauncher.exe` and `ReSkate.dll` from it into your skate. folder (where `Skate.exe` is),
-   replacing the ones there. On Steam: right-click skate. > Manage > Browse local files.
-   *Once official ReSkate ships it ([Dingo-Shenanigans/ReSkate#150](https://github.com/Dingo-Shenanigans/ReSkate/pull/150)), skip this step.*
-3. **The asset pack.** Install **[Hall of Meat](https://thunderstore.io/c/reskate/p/Kitty_Meow/Hall_of_Meat/)** from Thunderstore through the launcher's **MODS**
-   page, or download `Hall_of_Meat-<version>.zip` from the release and drag it onto the MODS page.
-   Make sure it is switched on.
+2. **Download `Hall-of-Meat-Complete-<version>.zip`** from the
+   [latest release](https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest).
+3. **Extract it into your skate. folder** (where `Skate.exe` is; on Steam: right-click skate. >
+   Manage > Browse local files). Say yes to replacing `ReSkateLauncher.exe` and `ReSkate.dll`.
+   You end up with `Mods\Hall_of_Meat\` next to `Skate.exe`.
 4. **Start the game with `ReSkateLauncher.exe`.** In game, keep ReSkate's own Hall of Meat off
    (Custom Stuff > Player > Hall of Meat): this one steps aside while that one is on.
 5. Bail.
 
-Turn it off by switching the asset pack off in the MODS tab (in game: Insert > MODS).
+Got the asset pack from Thunderstore instead? You still need step 3's `ReSkateLauncher.exe` and
+`ReSkate.dll` (from the same zip, or `ReSkate-HallOfMeat-<version>.zip`) until official ReSkate
+includes Skate 3 Hall of Meat.
+
+Turn it off by switching Hall of Meat off in the MODS tab (in game: Insert > MODS).
 
 **Console (`~`):** `hom status` shows it is running and your best bail; `hom lead <ms>` pulls the
 X-ray ahead if the bones ever trail the body (saved).
