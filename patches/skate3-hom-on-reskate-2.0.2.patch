@@ -833,10 +833,10 @@ index 0000000..6bcf3fb
 +} // namespace dingosdk::console
 diff --git a/Extension/Skate3HallOfMeat/hom_core.cpp b/Extension/Skate3HallOfMeat/hom_core.cpp
 new file mode 100644
-index 0000000..ef8823e
+index 0000000..f780933
 --- /dev/null
 +++ b/Extension/Skate3HallOfMeat/hom_core.cpp
-@@ -0,0 +1,648 @@
+@@ -0,0 +1,656 @@
 +#include "hom_core.h"
 +#include <algorithm>
 +#include <cmath>
@@ -960,10 +960,10 @@ index 0000000..ef8823e
 +std::string Tracker::watch_line() const {
 +    float torso = std::max({bone_change_[2], bone_change_[3], bone_change_[4]}), any = 0;
 +    for (const float c : bone_change_) any = std::max(any, c);
-+    char text[240];
-+    std::snprintf(text, sizeof(text), "state %u%s, speed %.1f (peak %.1f), hips %+.1f m/s, lying %d, ragdoll %d, hit torso %.1f any %.1f, fell %.2fs ago",
++    char text[300];
++    std::snprintf(text, sizeof(text), "state %u%s, speed %.1f (peak %.1f), hips %+.1f m/s, lying %d, ragdoll %d, hit torso %.1f any %.1f (last hit %.1f/%.1f peak %.1f), fell %.2fs ago",
 +                  previous_.physics_state, from_air_ ? " from the air" : "", body_speed_, recent_peak_speed_, hips_vertical_,
-+                  previous_.lying ? 1 : 0, previous_.ragdoll, torso, any, fast_fall_time_ < 0 ? -1.0 : previous_.time - fast_fall_time_);
++                  previous_.lying ? 1 : 0, previous_.ragdoll, torso, any, hit_torso_, hit_any_, hit_peak_, fast_fall_time_ < 0 ? -1.0 : previous_.time - fast_fall_time_);
 +    return text;
 +}
 +
@@ -1202,7 +1202,10 @@ index 0000000..ef8823e
 +            for (const float c : bone_change_) any = std::max(any, c);
 +            if (off_board && (torso >= config_.hit_torso || any >= config_.hit_any)) {
 +                // The pace the body had when this hit began (it decays fast once the body stops).
-+                hit_peak_ = hit_time_ >= 0 && s.time - hit_time_ < 0.25 ? std::max(hit_peak_, recent_peak_speed_) : recent_peak_speed_;
++                const bool same_hit = hit_time_ >= 0 && s.time - hit_time_ < 0.25;
++                hit_peak_ = same_hit ? std::max(hit_peak_, recent_peak_speed_) : recent_peak_speed_;
++                hit_torso_ = same_hit ? std::max(hit_torso_, torso) : torso;
++                hit_any_ = same_hit ? std::max(hit_any_, any) : any;
 +                hit_time_ = s.time;
 +            }
 +            // A body that falls hard and smashes into something is a crash at that instant, as Skate 3
@@ -1232,7 +1235,12 @@ index 0000000..ef8823e
 +        // Straight after a bail ends the next crash needs no re-arming: it carries that bail on.
 +        const bool may_start = armed_ || (ended_at_ >= 0 && s.time - ended_at_ <= 1.5);
 +        // Thrown down: it needs some pace behind it (a roll or a climb on foot goes down slowly).
-+        const bool thrown = may_start && hit_peak_ >= 4.5f && grounded && stopping && came_down && supported && down_since_ >= 0 &&
++        // On foot for a while (no board in the last 2 s): vaults, climbs and drops off ledges are driven
++        // through skate.'s ragdoll too, so a fall there only counts when it hits like a slam.
++        const bool on_foot = (left_board_time_ < 0 || s.time - left_board_time_ > 2.0) &&
++                             (last_glide_time_ < 0 || s.time - last_glide_time_ > 3.0); // (a glide's landing is no walk)
++        const bool slam_grade = hit_torso_ >= 6.0f || (hit_any_ >= 12.0f && hit_peak_ >= 9.0f);
++        const bool thrown = may_start && (!on_foot || slam_grade) && hit_peak_ >= 4.5f && grounded && stopping && came_down && supported && down_since_ >= 0 &&
 +                            s.time - down_since_ >= config_.down_time &&
 +                            hit_time_ >= 0 && s.time - hit_time_ <= 0.8 && hit_time_ >= down_since_ - 0.4;
 +        // Coming off the board, skate. switches the skater's pose over in a tick or two: that jump is
@@ -1487,10 +1495,10 @@ index 0000000..ef8823e
 +} // namespace dingosdk::skate3_hom
 diff --git a/Extension/Skate3HallOfMeat/hom_core.h b/Extension/Skate3HallOfMeat/hom_core.h
 new file mode 100644
-index 0000000..cdb9ee3
+index 0000000..1a0d858
 --- /dev/null
 +++ b/Extension/Skate3HallOfMeat/hom_core.h
-@@ -0,0 +1,239 @@
+@@ -0,0 +1,242 @@
 +#pragma once
 +#include <array>
 +#include <cstdint>
@@ -1700,7 +1708,10 @@ index 0000000..cdb9ee3
 +    bool pending_glide_{};          // the wait is a glide landing's (else a crash from the air)
 +    bool pending_needs_ragdoll_{};  // skate. said under control at the start: only a ragdoll makes it a crash
 +    bool seen_ragdoll_{};
-+    float hit_peak_{}; // the body's recent peak speed when it last hit something           // the ragdoll flag has read 1 at least once: it can be trusted
++    // The ragdoll flag has read 1 at least once: it can be trusted.
++    // What the last hit was (kept together while one hit lasts): the body's pace then, and how hard the
++    // torso and the hardest bone were hit.
++    float hit_peak_{}, hit_torso_{}, hit_any_{};
 +    bool jolt_is_impact_{};         // the bail began on the impact itself (crash landing, knocked off)
 +    std::array<float, 19> bone_hit_raw_{}; // this tick's hits before the board-switch cap
 +    double riding_since_{-1};

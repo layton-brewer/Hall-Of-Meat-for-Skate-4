@@ -499,6 +499,19 @@ int main() {
         m.run(0.5, {0, 0, 1}, 504, true, false);
         failures += check("a foot knocking a ledge while climbing down is no slam", m.bails == 0);
     }
+    {   // HOM TEST at 30.8 s: vaulting over the recycling bins on foot and dropping off the far side
+        // (skate. calls it ragdoll; log: hit and down, peak 18.5, hit torso small). No bail.
+        Sim m;
+        m.s.ragdoll = 1;
+        m.run(2.0, {0, 0, 4}, 504, true, false);
+        m.run(0.35, {0, 1.5f, 4}, 504, false, false);         // up onto the bins
+        m.run(0.25, {0, -4.5f, 3}, 504, false, false);         // and down the other side
+        for (int i : {2, 3, 4}) m.s.bone_centres[i][1] += 0.05f;   // the landing jolts the torso a little
+        m.run(1.0 / 60, {0, -0.5f, 1.5f}, 504, false, true);
+        m.run(0.5, {0, 0, 1.0f}, 504, false, true);
+        m.run(0.5, {0, 0, 0.5f}, 504, true, false);
+        failures += check("vaulting over bins and dropping off on foot is no bail", m.bails == 0);
+    }
     // Skate 3's graphs against the original's HUD readings.
     failures += check("bail 7.10 s pays 7,750", metric_points(3, 7.10f) == 7750);
     failures += check("drop 31.5 m pays ~5,750", std::abs(metric_points(2, 31.5f) - 5750) <= 10);

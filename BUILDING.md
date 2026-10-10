@@ -1,6 +1,6 @@
 # Building
 
-Everything here is current for **ReSkate v2.0.2** (multiplayer protocol 46), Hall of Meat 1.5.12 and
+Everything here is current for **ReSkate v2.0.2** (multiplayer protocol 46), Hall of Meat 1.5.13 and
 OG Camera 1.3.0.
 
 ## Hall of Meat (the DLL and launcher)
