@@ -450,6 +450,33 @@ int main() {
         for (int i = 0; i < 60; ++i) { m.run(1.0 / 60, {0, -5, 12}, 504, false, true); shown = shown || m.t.showing(); }
         failures += check("a jolt mid-glide (no ragdoll) is never shown", !shown);
     }
+    {   // Session 21:39: a hard landing on the feet off a 2.8 m drop. It looks like a slam, but skate.
+        // never calls the body a ragdoll: not shown.
+        Sim m;
+        m.s.ragdoll = 1;                                  // the flag has been seen working earlier
+        m.run(0.1, {0, 0, 0}, 504, false, true);
+        m.s.ragdoll = 0;
+        m.run(1.0, {0, 0, 7}, 100, true, false);
+        m.run(0.75, {0, -7.5f, 4}, 504, false, true, -1, false);
+        m.run(0.05, {0, 0, 0.3f}, 504, false, true);
+        bool shown = false;
+        for (int i = 0; i < 40; ++i) { m.run(1.0 / 60, {0, 0, 0.2f}, 504, false, true); shown = shown || m.t.showing(); }
+        m.run(0.6, {0, 0, 0}, 504, true, false);
+        failures += check("a hard landing skate. keeps under control is never shown", !shown);
+    }
+    {   // The same landing where skate. turns the body into a ragdoll: shown.
+        Sim m;
+        m.s.ragdoll = 1;
+        m.run(0.1, {0, 0, 0}, 504, false, true);
+        m.s.ragdoll = 0;
+        m.run(1.0, {0, 0, 7}, 100, true, false);
+        m.run(0.75, {0, -7.5f, 4}, 504, false, true, -1, false);
+        m.run(0.05, {0, 0, 0.3f}, 504, false, true);
+        m.s.ragdoll = 1;
+        bool shown = false;
+        for (int i = 0; i < 40; ++i) { m.run(1.0 / 60, {0, 0, 0.2f}, 504, false, true); shown = shown || m.t.showing(); }
+        failures += check("the same landing going ragdoll is shown", shown);
+    }
     // Skate 3's graphs against the original's HUD readings.
     failures += check("bail 7.10 s pays 7,750", metric_points(3, 7.10f) == 7750);
     failures += check("drop 31.5 m pays ~5,750", std::abs(metric_points(2, 31.5f) - 5750) <= 10);
