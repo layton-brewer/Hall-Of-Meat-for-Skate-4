@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.4
+- Same as 1.1.3 (republished).
+
 ## 1.1.3
 - Install is one download: Hall-of-Meat.zip from GitHub, extracted into the skate. folder.
 
