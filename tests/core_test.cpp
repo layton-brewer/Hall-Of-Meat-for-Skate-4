@@ -394,6 +394,22 @@ int main() {
         std::printf("     bails %d phase %d cancelled %d trig %s\n", m.bails, (int)m.t.phase(), m.t.cancelled(), m.t.trigger().c_str());
         failures += check("a real crash landing from the air is shown within 0.6 s", m.t.showing());
     }
+    {   // HOM test 22 at 36.1 s: a crash landing head first. The board goes as the skull hits; the
+        // torso slides on. Shown at once, and the skull is hurt (it showed no bones at all).
+        Sim m;
+        m.run(1.0, {0, 0, 9}, 100, true, false);
+        m.run(0.8, {0, -13, 9}, 201, true, false);
+        const double impact = m.time;
+        m.s.bone_centres[0][1] += 13.0f / 60; m.s.bone_centres[0][2] -= 9.0f / 60;   // the skull stops dead as
+        m.s.bone_centres[1][1] += 13.0f / 60; m.s.bone_centres[1][2] -= 9.0f / 60;   // the board goes
+        m.run(1.0 / 60, {0, -13, 9}, 504, false, false);
+        m.run(1.0 / 60, {0, 0, 6}, 504, false, true);
+        double shown_at = -1;
+        for (int i = 0; i < 60; ++i) { m.run(1.0 / 60, {0, 0, 2}, 504, false, true); if (shown_at < 0 && m.t.showing()) shown_at = m.time; }
+        std::printf("     shown %.2f s after impact (%s), skull damage %.2f, bone points %d\n", shown_at - impact, m.t.trigger().c_str(), m.t.live().damage[0], m.t.live().bone_points);
+        failures += check("test 22: a head-first crash landing shows at once", shown_at >= 0 && shown_at - impact < 0.12);
+        failures += check("test 22: a head-first crash landing hurts the skull", m.t.live().damage[0] > 0 && m.t.live().bone_points > 0);
+    }
     // Skate 3's graphs against the original's HUD readings.
     failures += check("bail 7.10 s pays 7,750", metric_points(3, 7.10f) == 7750);
     failures += check("drop 31.5 m pays ~5,750", std::abs(metric_points(2, 31.5f) - 5750) <= 10);
