@@ -1,0 +1,7 @@
+{
+    "name": "OG_Camera",
+    "version_number": "1.2.1",
+    "website_url": "",
+    "description": "Skate 3's camera in skate.: its 12 mm fisheye lens, its low and high chase cams, its lazy swing, and its grind, manual and big air shots. Data only, no DLL.",
+    "dependencies": []
+}

@@ -1,0 +1,20 @@
+diff --git a/cmake/Apps.cmake b/cmake/Apps.cmake
+index fafb13d..4b5808f 100644
+--- a/cmake/Apps.cmake
++++ b/cmake/Apps.cmake
+@@ -187,3 +187,15 @@ else()
+         dingosdk_lz4 dingosdk_zstd dingosdk_miniz dingosdk_word_filter OpenSSL::Crypto dl pthread)
+     set_target_properties(dingosdk_server PROPERTIES OUTPUT_NAME "ReSkateServer")
+ endif()
++
++if(TARGET dingosdk_mods)
++    add_executable(dingosdk_ebx_dump Engine/Vfs/Test/ebx_dump_tool.cpp)
++    target_link_libraries(dingosdk_ebx_dump PRIVATE dingosdk_mods)
++    target_include_directories(dingosdk_ebx_dump PRIVATE "${PROJECT_SOURCE_DIR}")
++    add_executable(dingosdk_ogcam_build Engine/Vfs/Test/ogcam_build.cpp)
++    target_link_libraries(dingosdk_ogcam_build PRIVATE dingosdk_mods)
++    target_include_directories(dingosdk_ogcam_build PRIVATE "${PROJECT_SOURCE_DIR}")
++    add_executable(dingosdk_ogcam_merge_check Engine/Vfs/Test/ogcam_merge_check.cpp)
++    target_link_libraries(dingosdk_ogcam_merge_check PRIVATE dingosdk_mods)
++    target_include_directories(dingosdk_ogcam_merge_check PRIVATE "${PROJECT_SOURCE_DIR}")
++endif()

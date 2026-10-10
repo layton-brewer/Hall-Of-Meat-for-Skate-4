@@ -1,0 +1,304 @@
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/bam_coregameassets
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/bam_levelroot
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/high_tod_1_morning
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/high_tod_2_noon
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/high_tod_3_afternoon
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/high_tod_4_evening
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/high_tod_5_night
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/high_tod_6_weatherday
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/low_tod_1_morning
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/low_tod_2_noon
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/low_tod_3_afternoon
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/low_tod_4_evening
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/low_tod_5_night
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/low_tod_6_weatherday
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/medium_tod_1_morning
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/medium_tod_2_noon
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/medium_tod_3_afternoon
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/medium_tod_4_evening
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/medium_tod_5_night
+target Win32/levels/game/bam_levelroot/bam_levelroot.toc win32/levels/game/bam_levelroot/medium_tod_6_weatherday
+target Win32/levels/game/dingolevel_ftue_island/dingolevel_ftue_island.toc win32/levels/game/dingolevel_ftue_island/dingolevel_ftue_island
+target Win32/levels/game/dingolevel_ftue_island/dingolevel_ftue_island.toc win32/levels/game/dingolevel_ftue_island/lighting_static_high
+target Win32/levels/game/dingolevel_ftue_island/dingolevel_ftue_island.toc win32/levels/game/dingolevel_ftue_island/lighting_static_low
+target Win32/levels/game/dingolevel_ftue_island/dingolevel_ftue_island.toc win32/levels/game/dingolevel_ftue_island/lighting_static_medium
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/high_tod_1_morning
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/high_tod_2_noon
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/high_tod_3_afternoon
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/high_tod_4_evening
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/high_tod_5_night
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/high_tod_6_weatherday
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/high_tod_7_weathernight
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/low_tod_1_morning
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/low_tod_2_noon
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/low_tod_3_afternoon
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/low_tod_4_evening
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/low_tod_5_night
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/low_tod_6_weatherday
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/low_tod_7_weathernight
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/medium_tod_1_morning
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/medium_tod_2_noon
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/medium_tod_3_afternoon
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/medium_tod_4_evening
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/medium_tod_5_night
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/medium_tod_6_weatherday
+target Win32/levels/game/dingolevel_isle_of_grom/dingolevel_isle_of_grom.toc win32/levels/game/dingolevel_isle_of_grom/medium_tod_7_weathernight
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/dingolevel_mpr
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/high_tod_1_morning
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/high_tod_2_noon
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/high_tod_3_afternoon
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/high_tod_4_evening
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/high_tod_5_night
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/low_tod_1_morning
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/low_tod_2_noon
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/low_tod_3_afternoon
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/low_tod_4_evening
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/low_tod_5_night
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/medium_tod_1_morning
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/medium_tod_2_noon
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/medium_tod_3_afternoon
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/medium_tod_4_evening
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/medium_tod_5_night
+target Win32/levels/game/dingolevel_mpr/dingolevel_mpr.toc win32/levels/game/dingolevel_mpr/mktg_s5splash_sh01
+target Win32/levels/game/dingolevel_sdm/dingolevel_sdm_int_001/dingolevel_sdm_int_001.toc win32/levels/game/dingolevel_sdm/dingolevel_sdm_int_001/dingolevel_sdm_int_001
+target Win32/levels/game/dingolevel_sdm/dingolevel_sdm_int_001/dingolevel_sdm_int_001.toc win32/levels/game/dingolevel_sdm/dingolevel_sdm_int_001/lighting_static_high
+target Win32/levels/game/dingolevel_sdm/dingolevel_sdm_int_002/dingolevel_sdm_int_002.toc win32/levels/game/dingolevel_sdm/dingolevel_sdm_int_002/dingolevel_sdm_int_002
+target Win32/levels/game/dingolevel_sdm/dingolevel_sdm_int_002/dingolevel_sdm_int_002.toc win32/levels/game/dingolevel_sdm/dingolevel_sdm_int_002/lighting_static_high
+
+# Skate 3 shoots everything on a 12 mm lens (camera_shots.FramingLensLength); about 80 degrees vertical.
+# Fixed, and the FOV-to-distance rescale is off so the framing distances stay Skate 3's.
+asset gameplay/cameras/rigs/camerarig_onboardfov
+set bd6cb733-949b-4d7c-ad56-e045507af105 FOV.Value 80
+set bd6cb733-949b-4d7c-ad56-e045507af105 FOV.Variable null
+set bd6cb733-949b-4d7c-ad56-e045507af105 EnableFOVCameraFramingScaling.Value false
+set bd6cb733-949b-4d7c-ad56-e045507af105 EnableFOVCameraFramingScaling.Variable null
+asset gameplay/cameras/rigs/camerarig_offboardfov
+set 69c28e99-ad82-4428-9b7b-b230c6124481 FOV.Value 80
+set 69c28e99-ad82-4428-9b7b-b230c6124481 FOV.Variable null
+set 69c28e99-ad82-4428-9b7b-b230c6124481 EnableFOVCameraFramingScaling.Value false
+set 69c28e99-ad82-4428-9b7b-b230c6124481 EnableFOVCameraFramingScaling.Variable null
+
+# Low: matched to Skate 3 footage: camera about 1.8 m up and 2.2 m back, looking down 14 degrees at the
+# skater's shoulders, skater centred (Skate 3's chase is straight behind, heading 180).
+asset gameplay/cameras/framingsets/onboardlowcameraframing
+set 735dbef9-2eff-4b2c-a09e-964767383466 LocalPivotOffset.y 1.25
+set 1806dc17-41ac-4e54-9333-a8e5172b10e8 LocalPositionOffset.Value.x 0
+set 1806dc17-41ac-4e54-9333-a8e5172b10e8 LocalPositionOffset.Value.z 2.3
+set c9d5f04c-badb-4abc-aced-414c40556274 LocalPositionOffset.Value.x 0
+set c9d5f04c-badb-4abc-aced-414c40556274 LocalPositionOffset.Value.z 2.4
+set 055afc8f-378c-4171-94cf-a151c5c945c2 LocalPositionOffset.Value.x 0
+set 055afc8f-378c-4171-94cf-a151c5c945c2 LocalPositionOffset.Value.z 2.4
+set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[0].PositionOffset.Value.x 0
+set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[0].PositionOffset.Value.z 2.4
+set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[1].PositionOffset.Value.x 0
+set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[1].PositionOffset.Value.z 2.3
+set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[2].PositionOffset.Value.x 0
+set 735dbef9-2eff-4b2c-a09e-964767383466 YawSlices[0].Framings[2].PositionOffset.Value.z 2.4
+asset gameplay/cameras/variables/camerafloatvariable_onboardlow_defaultpitch
+set 84abb6e1-6a11-41a2-8ddc-3a08044fd18e DefaultValue -14
+asset gameplay/cameras/variables/camerafloatvariable_onboard_low_unifiedpitch
+set e1a19338-5f03-49af-af60-b8dbdc595868 DefaultValue -14
+
+# High: Skate 3 high_chase is 3 m out at 30 degrees up, aimed 3 degrees above the subject.
+asset gameplay/cameras/framingsets/onboardhighcameraframing
+set 2e8685ae-2bf3-4521-8b88-927101324462 LocalPositionOffset.Value.x 0
+set 8c520ca8-292b-434c-a3cf-5591b8d13082 YawSlices[0].Framings[0].PositionOffset.Value.x 0
+asset gameplay/cameras/variables/camerafloatvariable_onboardhigh_defaultpitch
+set 54ea6f78-0efe-4464-a8d6-8afd32186760 DefaultValue -27
+asset gameplay/cameras/variables/camerafloatvariable_onboard_high_unifiedpitch
+set e85e0fab-857d-4a16-ad1a-88c69d05b8ba DefaultValue -27
+asset gameplay/cameras/variables/camerafloatvariable_onboard_high_ideallocalpitch
+set f873b9f1-188d-4875-9694-3f516c7f50b7 DefaultValue -27
+
+# Swing: Skate 3's heading tracker (spring 400, damping 100, smoothing 0.87) settles in about 0.25 s,
+# where skate.'s follow damping of 25 settles in 0.04 s.
+asset gameplay/cameras/dingoesmcameradirector_onboard_low
+set de5b8bf4-32e8-40b5-8195-8e5274280791 YawDampingFactor.Value 4
+set de5b8bf4-32e8-40b5-8195-8e5274280791 PitchDampingFactor.Value 6
+asset gameplay/cameras/dingoesmcameradirector_onboard_high
+set 64ff04bd-0237-47a6-928c-57c8b04b906f YawDampingFactor.Value 4
+set 64ff04bd-0237-47a6-928c-57c8b04b906f PitchDampingFactor.Value 6
+# Fisheye: base camera curve (gain 0.413, cubic 1.053, stretch 0.296 = skate.'s own fisheye lens)
+asset lighting/ve/camera/ve_dingo_50mm_neutral_base
+set #5 LensDistortionGain 0.413
+set #5 LensDistortionCubicGain 1.053
+set #5 LensDistortionStretch 0.296
+append #5 PropertyOverrides LensDistortionCubicGain
+append #5 PropertyOverrides LensDistortionStretch
+set #5 FieldFlagOverride0 30979
+# Fisheye: every gameplay look keeps it on
+asset lighting/ve/camera/ve_look_high_cool_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_high_night_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_high_noon_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_high_stadium_svo
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_high_sunrise_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_high_sunset_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_high_warm_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_low_cool_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_low_night_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_low_noon_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_low_sunrise_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_low_sunset_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_low_warm_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_med_cool_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_med_night_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_med_noon_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_med_sunrise_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_med_sunset_01
+set #4 EnableLensDistortion true
+asset lighting/ve/camera/ve_look_med_warm_01
+set #4 EnableLensDistortion true
+asset lighting/ve/tod/bam/s5/ve_look_high_fog_halloween26
+set #4 EnableLensDistortion true
+asset lighting/ve/tod/bam/s5/ve_look_low_fog_halloween26
+set #4 EnableLensDistortion true
+asset lighting/ve/tod/bam/s5/ve_look_med_fog_halloween26
+set #4 EnableLensDistortion true
+asset lighting/ve/tod/grom/s5/ve_look_high_night_halloween26
+set #4 EnableLensDistortion true
+asset lighting/ve/tod/grom/s5/ve_look_low_night_halloween26
+set #4 EnableLensDistortion true
+asset lighting/ve/tod/grom/s5/ve_look_med_night_halloween26
+set #4 EnableLensDistortion true
+# Low grind -> Skate 3 rail_far: 2.5 m, 15 deg up, looking down at the board
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/99b08e7_ag
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalPositionOffset.Value.y 0.647
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].PositionOffset.Value.y 0.647
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalPositionOffset.Value.z 2.415
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].PositionOffset.Value.z 2.415
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalRotationOffset.Value.x -15
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].RotationOffset.Value.x -15
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalPositionOffset.Value.x 0
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].PositionOffset.Value.x 0
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/99b08e7_ag_commandactiondata_0_onbegin
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalPositionOffset.Value.y 0.647
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].PositionOffset.Value.y 0.647
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalPositionOffset.Value.z 2.415
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].PositionOffset.Value.z 2.415
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalRotationOffset.Value.x -15
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].RotationOffset.Value.x -15
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalPositionOffset.Value.x 0
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].PositionOffset.Value.x 0
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/99b08e7_ag_commandactiondata_2_onend
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalPositionOffset.Value.y 0.647
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].PositionOffset.Value.y 0.647
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalPositionOffset.Value.z 2.415
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].PositionOffset.Value.z 2.415
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalRotationOffset.Value.x -15
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].RotationOffset.Value.x -15
+set 931ab302-104d-40cb-acee-432536f0dc30 LocalPositionOffset.Value.x 0
+set 41e20c28-5f41-423b-a27a-ed32709a40c5 YawSlices[0].Framings[0].PositionOffset.Value.x 0
+# Low manual -> between Skate 3 close_manual and far_manual: 1.6 m, level, tilted 5 deg up, 15 deg to the side
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/a60491d_ag
+set bf2c5669-333f-4653-914e-93810f96c82a LocalPositionOffset.Value.y 0.0
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].PositionOffset.Value.y 0.0
+set bf2c5669-333f-4653-914e-93810f96c82a LocalPositionOffset.Value.z 1.6
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].PositionOffset.Value.z 1.6
+set bf2c5669-333f-4653-914e-93810f96c82a LocalRotationOffset.Value.x 5
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].RotationOffset.Value.x 5
+set bf2c5669-333f-4653-914e-93810f96c82a LocalRotationOffset.Value.y -15
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].RotationOffset.Value.y -15
+set bf2c5669-333f-4653-914e-93810f96c82a LocalPositionOffset.Value.x -0.5
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].PositionOffset.Value.x -0.5
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/a60491d_ag_commandactiondata_0_onbegin
+set bf2c5669-333f-4653-914e-93810f96c82a LocalPositionOffset.Value.y 0.0
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].PositionOffset.Value.y 0.0
+set bf2c5669-333f-4653-914e-93810f96c82a LocalPositionOffset.Value.z 1.6
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].PositionOffset.Value.z 1.6
+set bf2c5669-333f-4653-914e-93810f96c82a LocalRotationOffset.Value.x 5
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].RotationOffset.Value.x 5
+set bf2c5669-333f-4653-914e-93810f96c82a LocalRotationOffset.Value.y -15
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].RotationOffset.Value.y -15
+set bf2c5669-333f-4653-914e-93810f96c82a LocalPositionOffset.Value.x -0.5
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].PositionOffset.Value.x -0.5
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/a60491d_ag_commandactiondata_2_onend
+set bf2c5669-333f-4653-914e-93810f96c82a LocalPositionOffset.Value.y 0.0
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].PositionOffset.Value.y 0.0
+set bf2c5669-333f-4653-914e-93810f96c82a LocalPositionOffset.Value.z 1.6
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].PositionOffset.Value.z 1.6
+set bf2c5669-333f-4653-914e-93810f96c82a LocalRotationOffset.Value.x 5
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].RotationOffset.Value.x 5
+set bf2c5669-333f-4653-914e-93810f96c82a LocalRotationOffset.Value.y -15
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].RotationOffset.Value.y -15
+set bf2c5669-333f-4653-914e-93810f96c82a LocalPositionOffset.Value.x -0.5
+set 63ad2a3c-44d4-4e8e-8f88-8ca74e15f8bc YawSlices[0].Framings[0].PositionOffset.Value.x -0.5
+# Low big air -> Skate 3 air_big: pulled back to 4 m, 15 deg up, tilted 5 deg up at the skater
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b076a5c_ag
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.y 1.035
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.y 1.035
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.z 3.864
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.z 3.864
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalRotationOffset.Value.x 5
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].RotationOffset.Value.x 5
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b076a5c_ag_commandactiondata_0_onbegin
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.y 1.035
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.y 1.035
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.z 3.864
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.z 3.864
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalRotationOffset.Value.x 5
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].RotationOffset.Value.x 5
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b076a5c_ag_commandactiondata_2_onend
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.y 1.035
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.y 1.035
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalPositionOffset.Value.z 3.864
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].PositionOffset.Value.z 3.864
+set 94d298bb-fd13-4c3f-bcd7-8b5bd52f29a2 LocalRotationOffset.Value.x 5
+set edda6f1b-95a0-4fe3-90d4-55219cc58e3c YawSlices[0].Framings[0].RotationOffset.Value.x 5
+# Low big air (second framing)
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/b076a5c_ag
+set b34dbebc-9b64-4f7b-9384-56c7f3a6d16a LocalPositionOffset.Value.y 1.035
+set 53965c6e-3e26-4c91-b46f-e491fd82f274 YawSlices[0].Framings[0].PositionOffset.Value.y 1.035
+set b34dbebc-9b64-4f7b-9384-56c7f3a6d16a LocalPositionOffset.Value.z 3.864
+set 53965c6e-3e26-4c91-b46f-e491fd82f274 YawSlices[0].Framings[0].PositionOffset.Value.z 3.864
+set b34dbebc-9b64-4f7b-9384-56c7f3a6d16a LocalRotationOffset.Value.x 5
+set 53965c6e-3e26-4c91-b46f-e491fd82f274 YawSlices[0].Framings[0].RotationOffset.Value.x 5
+# High manual -> Skate 3 high_manual: 2.25 m, 19 deg up, looking down at the skater (the manual state levels the orbit)
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/aea49a4_ag
+set d9f51af0-d17e-4c3e-a8f2-942280b5ebf3 LocalPositionOffset.Value.y 0.733
+set 61b1b0b3-5b7f-4688-a00e-65fb8d27f783 YawSlices[0].Framings[0].PositionOffset.Value.y 0.733
+set d9f51af0-d17e-4c3e-a8f2-942280b5ebf3 LocalPositionOffset.Value.z 2.127
+set 61b1b0b3-5b7f-4688-a00e-65fb8d27f783 YawSlices[0].Framings[0].PositionOffset.Value.z 2.127
+set d9f51af0-d17e-4c3e-a8f2-942280b5ebf3 LocalRotationOffset.Value.x -19
+set 61b1b0b3-5b7f-4688-a00e-65fb8d27f783 YawSlices[0].Framings[0].RotationOffset.Value.x -19
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/aea49a4_ag_commandactiondata_0_onbegin
+set d9f51af0-d17e-4c3e-a8f2-942280b5ebf3 LocalPositionOffset.Value.y 0.733
+set 61b1b0b3-5b7f-4688-a00e-65fb8d27f783 YawSlices[0].Framings[0].PositionOffset.Value.y 0.733
+set d9f51af0-d17e-4c3e-a8f2-942280b5ebf3 LocalPositionOffset.Value.z 2.127
+set 61b1b0b3-5b7f-4688-a00e-65fb8d27f783 YawSlices[0].Framings[0].PositionOffset.Value.z 2.127
+set d9f51af0-d17e-4c3e-a8f2-942280b5ebf3 LocalRotationOffset.Value.x -19
+set 61b1b0b3-5b7f-4688-a00e-65fb8d27f783 YawSlices[0].Framings[0].RotationOffset.Value.x -19
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/aea49a4_ag_commandactiondata_2_onend
+set d9f51af0-d17e-4c3e-a8f2-942280b5ebf3 LocalPositionOffset.Value.y 0.733
+set 61b1b0b3-5b7f-4688-a00e-65fb8d27f783 YawSlices[0].Framings[0].PositionOffset.Value.y 0.733
+set d9f51af0-d17e-4c3e-a8f2-942280b5ebf3 LocalPositionOffset.Value.z 2.127
+set 61b1b0b3-5b7f-4688-a00e-65fb8d27f783 YawSlices[0].Framings[0].PositionOffset.Value.z 2.127
+set d9f51af0-d17e-4c3e-a8f2-942280b5ebf3 LocalRotationOffset.Value.x -19
+set 61b1b0b3-5b7f-4688-a00e-65fb8d27f783 YawSlices[0].Framings[0].RotationOffset.Value.x -19
+# High big air -> Skate 3 high_bigair: pulled back to 5 m
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/ba1b9e8_ag
+set ecd85611-c2fd-491f-8bc4-5f65e207c929 LocalPositionOffset.Value.z 5.0
+set 91e1dc34-827f-4b3c-aed2-0679bee5a232 YawSlices[0].Framings[0].PositionOffset.Value.z 5.0
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/ba1b9e8_ag_commandactiondata_0_onbegin
+set ecd85611-c2fd-491f-8bc4-5f65e207c929 LocalPositionOffset.Value.z 5.0
+set 91e1dc34-827f-4b3c-aed2-0679bee5a232 YawSlices[0].Framings[0].PositionOffset.Value.z 5.0
+asset gameplay/cameras/dingoesmcameradirector_esmcameradirectortree/ba1b9e8_ag_commandactiondata_2_onend
+set ecd85611-c2fd-491f-8bc4-5f65e207c929 LocalPositionOffset.Value.z 5.0
+set 91e1dc34-827f-4b3c-aed2-0679bee5a232 YawSlices[0].Framings[0].PositionOffset.Value.z 5.0
