@@ -424,6 +424,32 @@ int main() {
         std::printf("     glide slam shown %.2f s after impact\n", shown_at - impact);
         failures += check("test 24: a glide ending in a slam shows within 0.3 s", shown_at >= 0 && shown_at - impact < 0.3);
     }
+    {   // Session 21:29: a heavy slam landing on a slope, the ragdoll sliding on downhill. skate. calls
+        // it a ragdoll: shown, never taken back as a glide.
+        Sim m;
+        m.run(1.0, {0, 0, 9}, 100, true, false);
+        m.run(0.8, {0, -15, 12}, 201, true, false);
+        m.s.ragdoll = 1;
+        m.s.bone_centres[0][1] += 15.0f / 60;
+        m.run(1.0 / 60, {0, -15, 12}, 504, false, true);
+        m.run(1.0 / 60, {0, -4, 6}, 504, false, true);
+        bool shown = false;
+        for (int i = 0; i < 60; ++i) { m.run(1.0 / 60, {0, -3.5f, 6}, 504, false, true); shown = shown || m.t.showing(); }
+        failures += check("a ragdoll sliding down a slope after a crash landing is shown", shown && m.t.cancelled() == 0);
+        m.s.ragdoll = -1;
+    }
+    {   // The same glide jolt as before, with skate. saying it is no ragdoll: still never shown.
+        Sim m;
+        m.s.ragdoll = 0;
+        m.run(1.0, {0, 0, 9}, 100, true, false);
+        m.run(0.6, {0, 10, 11}, 201, true, false, -1, true);
+        m.run(1.0 / 60, {0, 4, 11}, 504, true, false);
+        m.run(0.5, {0, -9, 14}, 504, false, true);
+        m.run(2.0 / 60, {0, -0.5f, 4}, 504, false, true);
+        bool shown = false;
+        for (int i = 0; i < 60; ++i) { m.run(1.0 / 60, {0, -5, 12}, 504, false, true); shown = shown || m.t.showing(); }
+        failures += check("a jolt mid-glide (no ragdoll) is never shown", !shown);
+    }
     // Skate 3's graphs against the original's HUD readings.
     failures += check("bail 7.10 s pays 7,750", metric_points(3, 7.10f) == 7750);
     failures += check("drop 31.5 m pays ~5,750", std::abs(metric_points(2, 31.5f) - 5750) <= 10);
