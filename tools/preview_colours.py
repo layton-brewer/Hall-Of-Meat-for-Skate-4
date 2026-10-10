@@ -19,6 +19,13 @@ def load():
         out.append((name, v, idx))
     return out
 
+TEX = np.asarray(Image.open(PKG + "/art/bone_texture.png").convert("RGB"), float) / 255.0
+def stage(t):
+    if t < 0.5:
+        u = t / 0.5; a, b = np.array([255, 248, 250.]), np.array([255, 165, 128.])
+    else:
+        u = (t - 0.5) / 0.5; a, b = np.array([255, 165, 128.]), np.array([245, 74, 16.])
+    return a + (b - a) * u
 def rim_for(heat, broken):
     if broken: return np.array([236, 70, 26.])
     m = lambda a, b: a + (b - a) * heat
@@ -30,7 +37,7 @@ def glow_for(heat, broken):
     return np.array([m(190, 255), m(205, 95), m(240, 35)])
 
 # Like the Skate 3 shot: the pelvis and one leg broken, an arm hurt, the rest lightly hurt.
-state = {"Hips": (1, True), "Thigh_Right": (1, True), "Calf_Right": (1, True), "Forearm_Right": (0.7, False), "Hand_Right": (0.5, False)}
+state = {"Hips": (1, True), "Thigh_Right": (1, True), "Calf_Right": (1, True), "Forearm_Right": (0.5, False), "Hand_Right": (0.5, False), "Rib_Cage": (0.5, False)}
 meshes = load()
 yaw, pitch = math.radians(20), math.radians(-55)
 cy, sy, cp, sp = math.cos(yaw), math.sin(yaw), math.cos(pitch), math.sin(pitch)
@@ -45,8 +52,12 @@ for name, v, idx in meshes:
     core = np.array([255, 252 - 47 * warm, 255 - 80 * warm])
     p = (v[:, :3] - centre) @ R.T; n = v[:, 3:6] @ R.T
     n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-6)
-    f = np.abs(n[:, 2]) ** (0.8 - 0.3 * warm)
-    col = rim[None] + (core - rim)[None] * f[:, None]
+    facing = np.abs(n[:, 2])
+    tint = stage(heat)
+    th, tw = TEX.shape[:2]
+    uv = v[:, 6:8]
+    tex = TEX[(np.mod(uv[:, 1], 1) * (th - 1)).astype(int), (np.mod(uv[:, 0], 1) * (tw - 1)).astype(int)]
+    col = np.clip(tint[None] * tex * (0.82 + 0.3 * (1 - facing))[:, None], 0, 255)
     sx = S / 2 + p[:, 0] * scale; syy = S / 2 - p[:, 1] * scale; z = p[:, 2]
     for a, b, c in idx:
         xs = np.array([sx[a], sx[b], sx[c]]); ys = np.array([syy[a], syy[b], syy[c]])
@@ -62,7 +73,7 @@ for name, v, idx in meshes:
         if not win.any(): continue
         cc = w0[..., None] * col[a] + w1[..., None] * col[b] + w2[..., None] * col[c]
         reg[win] = zz[win]; img[y0:y1 + 1, x0:x1 + 1][win] = cc[win]
-        glow[y0:y1 + 1, x0:x1 + 1][win] = glow_for(heat, broken) * (0.3 + 0.9 * heat)
+        glow[y0:y1 + 1, x0:x1 + 1][win] = np.array([255, 80, 30.]) * max(0.0, heat - 0.3) * 0.9
 g = np.asarray(Image.fromarray(np.clip(glow, 0, 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(9)), float)
 out = np.clip(img + g * 0.55, 0, 255).astype(np.uint8)
 ours = Image.fromarray(out)

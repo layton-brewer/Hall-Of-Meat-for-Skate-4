@@ -410,6 +410,20 @@ int main() {
         failures += check("test 22: a head-first crash landing shows at once", shown_at >= 0 && shown_at - impact < 0.12);
         failures += check("test 22: a head-first crash landing hurts the skull", m.t.live().damage[0] > 0 && m.t.live().bone_points > 0);
     }
+    {   // HOM test 24 at 3.5 s: a jump into a spread-eagle glide that ends in a heavy slam, the body
+        // stopped dead: shown at once (it took 0.6 s).
+        Sim m;
+        m.run(1.0, {0, 0, 7}, 100, true, false);
+        m.run(0.3, {0, 5, 11}, 504, true, false);
+        m.run(1.2, {0, -4, 16}, 504, false, true);
+        m.run(0.4, {0, -9, 18}, 504, false, true);
+        const double impact = m.time;
+        m.run(0.05, {0, 0, 0.5f}, 504, false, true);
+        double shown_at = -1;
+        for (int i = 0; i < 60; ++i) { m.run(1.0 / 60, {0, 0, 0.3f}, 504, false, true); if (shown_at < 0 && m.t.showing()) shown_at = m.time; }
+        std::printf("     glide slam shown %.2f s after impact\n", shown_at - impact);
+        failures += check("test 24: a glide ending in a slam shows within 0.3 s", shown_at >= 0 && shown_at - impact < 0.3);
+    }
     // Skate 3's graphs against the original's HUD readings.
     failures += check("bail 7.10 s pays 7,750", metric_points(3, 7.10f) == 7750);
     failures += check("drop 31.5 m pays ~5,750", std::abs(metric_points(2, 31.5f) - 5750) <= 10);
