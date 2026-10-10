@@ -477,6 +477,28 @@ int main() {
         for (int i = 0; i < 40; ++i) { m.run(1.0 / 60, {0, 0, 0.2f}, 504, false, true); shown = shown || m.t.showing(); }
         failures += check("the same landing going ragdoll is shown", shown);
     }
+    {   // Session 22:02:07: off the board, rolling on the ground at walking pace (peak 3.3 m/s); the
+        // roll jolts the torso. No bail.
+        Sim m;
+        m.run(1.0, {0, 0, 3}, 504, true, false);
+        m.run(0.3, {0, 0, 3}, 504, false, true);
+        for (int i : {2, 3, 4}) m.s.bone_centres[i][2] -= 0.09f;      // the roll jolts the torso
+        m.run(1.0 / 60, {0, 0, 3}, 504, false, true);
+        m.run(0.4, {0, 0, 1.0f}, 504, false, true);
+        m.run(0.5, {0, 0, 1.0f}, 504, true, false);
+        failures += check("rolling on foot at walking pace starts no bail", m.bails == 0);
+    }
+    {   // Session 22:02:04: climbing down off a ledge, a foot knocks it hard (any 18.6, torso 3.6,
+        // peak 7.9 m/s): no slam.
+        Sim m;
+        m.run(1.0, {0, 0, 3}, 504, true, false);
+        m.run(0.3, {0, -6.5f, 3}, 504, false, false);
+        for (int i : {15, 16, 17, 18}) m.s.bone_centres[i][1] += 0.28f;   // a foot stops dead on the ledge
+        m.run(1.0 / 60, {0, -6.5f, 3}, 504, false, false);
+        m.run(0.15, {0, -1, 2}, 504, false, false);
+        m.run(0.5, {0, 0, 1}, 504, true, false);
+        failures += check("a foot knocking a ledge while climbing down is no slam", m.bails == 0);
+    }
     // Skate 3's graphs against the original's HUD readings.
     failures += check("bail 7.10 s pays 7,750", metric_points(3, 7.10f) == 7750);
     failures += check("drop 31.5 m pays ~5,750", std::abs(metric_points(2, 31.5f) - 5750) <= 10);
