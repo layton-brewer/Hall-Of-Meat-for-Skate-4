@@ -58,7 +58,7 @@ X-ray ahead if the bones ever trail the body (saved).
 
 **Troubleshooting**
 - *Nothing on a crash:* type `hom status`. If the command is unknown, your ReSkate.dll is not this
-  build (step 2). If it answers, check the asset pack is installed and on (step 3) and ReSkate's own
+  build (step 3). If it answers, check `Mods\Hall_of_Meat\` is there and switched on in MODS (step 3) and ReSkate's own
   Hall of Meat is off (step 4).
 - *Back to normal after a ReSkate update:* the official launcher puts back the official ReSkate.dll;
   extract the zip again (until official ReSkate includes it). This launcher does not update itself.
