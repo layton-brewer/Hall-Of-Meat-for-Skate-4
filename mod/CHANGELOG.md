@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.2
+- README: works on its own once ReSkate ships Skate 3 Hall of Meat (how to check), and the build to use until then.
+
 ## 1.1.1
 - New cover: Skate 3's own Hall of Meat X-ray skeleton.
 - README for Thunderstore: what's in it and the ReSkate build it needs.

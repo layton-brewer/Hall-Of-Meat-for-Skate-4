@@ -1,7 +1,7 @@
 {
     "name": "Hall_of_Meat",
-    "version_number": "1.1.1",
+    "version_number": "1.1.2",
     "website_url": "https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4",
-    "description": "Skate 3's Hall of Meat, the nostalgic one: X-ray bones glowing orange, Skate 3's damage and score tables, Thrasher panel, slow motion, car bonus and bone crunches. Needs the ReSkate Hall of Meat build (see README).",
+    "description": "Skate 3's Hall of Meat, the nostalgic one: X-ray bones in Skate 3's white, orange and red, its damage and score tables, Thrasher panel, slow motion and bone crunches. Needs ReSkate with Skate 3 Hall of Meat (see README).",
     "dependencies": []
 }

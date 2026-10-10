@@ -23,8 +23,12 @@ while Skate 3's Thrasher score panel counts your bail the way Skate 3 did.
 - Works in multiplayer sessions (the slow motion stays single player).
 
 ## Requirements
-- **The ReSkate build with Hall of Meat.** This package holds the art, meshes and sounds; the code
-  that draws them is in its ReSkate.dll. Get `ReSkate-HallOfMeat-<version>.zip` from
+- **A ReSkate with Skate 3 Hall of Meat built in.** This package holds Skate 3's art, meshes and
+  sounds; the code that draws them is part of ReSkate itself. It is on its way into official ReSkate
+  (https://github.com/Dingo-Shenanigans/ReSkate/pull/150): once your ReSkate has it, installing this
+  package is all you need. To check, type `hom status` in the console (`~`); if ReSkate doesn't know
+  the command, your ReSkate doesn't have it yet.
+- **Until then**, use the ReSkate build that has it: get `ReSkate-HallOfMeat-<version>.zip` from
   https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest and copy
   `ReSkateLauncher.exe` and `ReSkate.dll` beside `Skate.exe`. It is official ReSkate v2.0.1 plus Hall
   of Meat, so multiplayer works with everyone on 2.0.1.
