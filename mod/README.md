@@ -1,5 +1,23 @@
 # Hall of Meat for Skate 4
 
+# ⚠️ STOP: THIS DOES NOTHING ON ITS OWN ⚠️
+
+## This Thunderstore page is only half of the mod. Installing it alone will show NOTHING in game.
+
+**You MUST ALSO download `Hall-of-Meat.zip` from GitHub** (it has the ReSkate build that runs Hall of Meat):
+
+### 👉 https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest/download/Hall-of-Meat.zip
+
+1. Close the game.
+2. Download the zip above.
+3. Extract it into your skate. folder (where `Skate.exe` is). Say yes to replace files.
+4. Start the game with `ReSkateLauncher.exe` (NOT the normal launcher).
+
+**The GitHub zip already contains this mod, so you do not need to install anything from Thunderstore.**
+Nothing happens when you crash? You skipped the GitHub zip. Full instructions further down.
+
+---
+
 **The nostalgic one.** Skate 3's Hall of Meat, back in skate. through ReSkate, rebuilt from Skate 3's
 own files. Crash, and the picture closes in to a dark, grainy blue-grey spotlight while your skeleton
 shows through the body: hurt bones glow orange, breaks burn red and the game drops into slow motion,

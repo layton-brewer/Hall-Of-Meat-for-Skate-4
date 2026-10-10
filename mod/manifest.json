@@ -1,7 +1,7 @@
 {
     "name": "Hall_of_Meat",
-    "version_number": "1.1.5",
+    "version_number": "1.1.6",
     "website_url": "https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4",
-    "description": "Skate 3's Hall of Meat, the nostalgic one: X-ray bones in Skate 3's white, orange and red, its damage and score tables, Thrasher panel, slow motion and bone crunches. One-zip install in the README.",
+    "description": "REQUIRES the GitHub download or it does NOTHING (link in README). Skate 3's Hall of Meat: X-ray bones, scoring, Thrasher panel, sounds, slow-mo. Download Hall-of-Meat.zip from GitHub, extract into skate. folder.",
     "dependencies": []
 }
