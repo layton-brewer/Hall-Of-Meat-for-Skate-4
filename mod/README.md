@@ -35,12 +35,32 @@ while Skate 3's Thrasher score panel counts your bail the way Skate 3 did.
 - ReSkate 2.0 has its own, separate Hall of Meat (Custom Stuff > Player > Hall of Meat). Leave that
   one off to see this one; this one steps aside whenever it is on.
 
-## Use
-Install from the launcher's MODS page, or drop the folder into `Mods/`. Turn it off in the MODS tab
-of the ReSkate menu (Insert) to switch Hall of Meat off.
+## Install
+1. Close the game.
+2. **ReSkate with Skate 3 Hall of Meat** (skip once official ReSkate ships it, see Requirements):
+   download `ReSkate-HallOfMeat-<version>.zip` from
+   https://github.com/layton-brewer/Hall-Of-Meat-for-Skate-4/releases/latest, and copy
+   `ReSkateLauncher.exe` and `ReSkate.dll` from it into your skate. folder (where `Skate.exe` is),
+   replacing the ones there. Steam: right-click skate. > Manage > Browse local files.
+3. **This package**: in the ReSkate launcher, open **MODS**, find **Hall of Meat** and install it
+   (or drag this zip onto the MODS page). Make sure it is switched on.
+4. Start the game with `ReSkateLauncher.exe`. In game, keep ReSkate's own Hall of Meat off
+   (Custom Stuff > Player > Hall of Meat).
+5. Bail. Hard.
 
-Console (`~`): `hom status` shows your best bail. `hom lead <ms>` pulls the X-ray ahead if the bones
-ever trail the body on your machine (saved).
+To switch it off, turn the package off in the MODS tab (in game: Insert > MODS).
+
+## Console (`~`)
+- `hom status`: shows it is running, and your best bail.
+- `hom lead <ms>`: pulls the X-ray ahead if the bones ever trail the body on your machine (saved).
+
+## Troubleshooting
+- **Nothing on a crash:** type `hom status`. Unknown command: your ReSkate has no Skate 3 Hall of
+  Meat yet (step 2). If it answers, check this package is installed and switched on (step 3), and
+  that ReSkate's own Hall of Meat is off (step 4).
+- **No bone sounds:** the game found no sound output device; plug one in and they start on their own.
+- **It went back to normal after a ReSkate update:** the official launcher puts back the official
+  ReSkate.dll. Redo step 2 until official ReSkate includes it.
 
 ## Credits
 Hall of Meat, its art, meshes and sounds are from Skate 3 by EA Black Box. Thrasher is a trademark of
