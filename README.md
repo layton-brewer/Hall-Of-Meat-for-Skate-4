@@ -61,7 +61,7 @@ X-ray ahead if the bones ever trail the body (saved).
   build (step 2). If it answers, check the asset pack is installed and on (step 3) and ReSkate's own
   Hall of Meat is off (step 4).
 - *Back to normal after a ReSkate update:* the official launcher puts back the official ReSkate.dll;
-  redo step 2 (until official ReSkate includes it). This launcher does not update itself.
+  extract the zip again (until official ReSkate includes it). This launcher does not update itself.
 - *No bone sounds:* no sound output device was found; plug one in and they start on their own.
 
 ## What is in it
