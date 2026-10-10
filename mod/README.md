@@ -8,7 +8,7 @@ while Skate 3's Thrasher score panel counts your bail the way Skate 3 did.
 ## What's in it
 - **X-ray skeleton** drawn with Skate 3's own bone meshes and bone texture, on the ragdoll from the
   moment you crash until you get back up.
-- **Skate 3's orange glow**: bones heat from white to orange as they're hurt; breaks burn red-orange.
+- **Skate 3's bone colours**: white while bruised, orange as the damage builds, red-orange at a break.
 - **Skate 3's damage model**: 25 body parts, each with up to six damage levels from bruised to
   broken, with Skate 3's points and impact thresholds, and hits that spread to connected parts.
 - **Skate 3's score graphs** for bail time, drop, air, speed and rotation, and its HUD rules for
@@ -19,7 +19,8 @@ while Skate 3's Thrasher score panel counts your bail the way Skate 3 did.
 - **Skate 3's bone-crunch sounds**, one for every new injury.
 - **The HoM look**: Skate 3's colour matrix on the game picture, spotlight, black corners and film grain.
 - **Each map's best bail**, saved with your profile (NEW BEST / BEST under the score).
-- Triggers on every crash, on or off the board. Glides, hippy jumps and plants don't count.
+- Triggers on every real crash, on or off the board, the moment you hit. Glides, dives, hippy jumps,
+  plants, hard landings on your feet, rolling and climbing don't count.
 - Works in multiplayer sessions (the slow motion stays single player).
 
 ## Install (one download)

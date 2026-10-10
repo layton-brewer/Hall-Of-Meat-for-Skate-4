@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.5
+- Page: Skate 3's white / orange / red bones, and what counts as a crash (hard landings, rolls and climbs don't). Use with Hall-of-Meat.zip 1.5.11 or later.
+
 ## 1.1.4
 - Same as 1.1.3 (republished).
 
